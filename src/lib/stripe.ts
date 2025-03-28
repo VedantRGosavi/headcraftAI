@@ -12,7 +12,7 @@ const stripe = new Stripe(stripeSecretKey, {
  * Constants for product prices
  */
 export const PRICES = {
-  HEADSHOT_GENERATION: 'price_headshot_generation', // This would be a real price ID from Stripe
+  HEADSHOT_GENERATION: 'price_1R7chHK9ng7JDxkssJ8d6c7z', // Basic tier price ID
 };
 
 /**

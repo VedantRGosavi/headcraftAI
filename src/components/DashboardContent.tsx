@@ -13,6 +13,7 @@ const DashboardContent = () => {
   const [uploadedImages, setUploadedImages] = useState<ImageType[]>([]);
   const [headshots, setHeadshots] = useState<HeadshotWithImages[]>([]);
   const [loading, setLoading] = useState(true);
+  const [preferences, setPreferences] = useState('');
 
   useEffect(() => {
     // Load user's images and headshots when component mounts
@@ -115,6 +116,56 @@ const DashboardContent = () => {
               </div>
             ))}
           </div>
+          <div className="mt-6">
+            <div className="mb-4">
+              <label htmlFor="preferences" className="block text-sm font-medium text-gray-700 mb-2">
+                Headshot Preferences
+              </label>
+              <textarea
+                id="preferences"
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Describe your preferences (e.g., background color, lighting, style, expression)"
+                onChange={(e) => setPreferences(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  // Call the generate API with the selected images and preferences
+                  fetch('/api/upload/generate', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      imageIds: uploadedImages.map(img => img.id),
+                      preferences: {
+                        prompt: preferences
+                      }
+                    }),
+                  })
+                  .then(async (response) => {
+                    const data = await response.json();
+                    if (!response.ok) {
+                      throw new Error(data.error || 'Failed to generate headshot');
+                    }
+                    // Redirect to checkout if needed
+                    if (data.checkoutUrl) {
+                      window.location.href = data.checkoutUrl;
+                    }
+                  })
+                  .catch((error) => {
+                    console.error('Error generating headshot:', error);
+                    alert('Failed to generate headshot. Please try again.');
+                  });
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Generate Headshot
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -140,13 +191,6 @@ const DashboardContent = () => {
         <div className="bg-white shadow sm:rounded-lg p-6 text-center py-8">
           <h3 className="text-lg font-medium text-gray-900 mb-4">No content yet</h3>
           <p className="text-gray-600 mb-6">Start by uploading your photos above to generate professional headshots.</p>
-          <Image
-            src="/images/empty-state.svg"
-            alt="No content"
-            width={200}
-            height={200}
-            className="mx-auto"
-          />
         </div>
       )}
     </div>

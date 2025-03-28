@@ -1,12 +1,6 @@
 {
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -18,7 +12,6 @@
       ]
     }
   ],
-  "crons": [],
   "git": {
     "deploymentEnabled": {
       "main": true

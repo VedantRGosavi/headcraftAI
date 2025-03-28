@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stackServerApp } from '@/stack';
+import { stackServerApp } from '../../../../stack';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 // Initialize S3 client

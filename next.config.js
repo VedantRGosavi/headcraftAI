@@ -7,14 +7,10 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
-  swcMinify: true,
   compress: true,
   productionBrowserSourceMaps: false,
   experimental: {
-    optimizeCss: true,
-    turbotrace: {
-      logLevel: 'error'
-    }
+    optimizeCss: true
   }
 };
 

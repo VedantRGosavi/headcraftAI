@@ -1,3 +1,4 @@
+import React from "react";
 import type { Metadata } from "next";
 import { StackProvider, StackTheme } from "@stackframe/stack";
 import { stackServerApp } from "../stack";
@@ -42,9 +43,13 @@ export default function RootLayout({
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      ><StackProvider app={stackServerApp}><StackTheme>
-        {children}
-      </StackTheme></StackProvider></body>
+      >
+        <StackProvider app={stackServerApp}>
+          <StackTheme>
+            {children}
+          </StackTheme>
+        </StackProvider>
+      </body>
     </html>
   );
 }

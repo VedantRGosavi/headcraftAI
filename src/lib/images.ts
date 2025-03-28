@@ -93,10 +93,13 @@ async function executeQuery<T>(query: string, params: unknown[] = []): Promise<T
 // Helper function to upload file to storage
 async function uploadFileToStorage(file: File | Blob, filePath: string): Promise<string> {
   try {
+    // Ensure filePath is properly formatted
+    const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+    
     // Create a FormData object
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('path', filePath);
+    formData.append('path', normalizedPath);
 
     // Upload to your storage API endpoint
     const response = await fetch('/api/storage/upload', {
@@ -104,15 +107,16 @@ async function uploadFileToStorage(file: File | Blob, filePath: string): Promise
       body: formData,
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      throw new Error('Failed to upload file to storage');
+      throw new Error(data.error || 'Failed to upload file to storage');
     }
 
-    const data = await response.json() as { url: string };
     return data.url;
   } catch (error) {
     console.error('Error uploading file to storage:', error);
-    throw error;
+    throw error instanceof Error ? error : new Error('Failed to upload file to storage');
   }
 }
 

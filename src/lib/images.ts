@@ -75,8 +75,14 @@ function getMockResult<T extends keyof MockResult>(functionName: T): MockResult[
 }
 
 // Use a real database connection only in production runtime
-const isServerRuntime = process.env.NODE_ENV === 'production' && typeof window === 'undefined' && process.env.VERCEL_ENV;
-const db = isServerRuntime ? neon(process.env.DATABASE_URL || '') : null;
+const isServerRuntime = typeof window === 'undefined';
+const dbUrl = process.env.DATABASE_URL;
+
+if (isServerRuntime && !dbUrl) {
+  console.error('DATABASE_URL environment variable is not set');
+}
+
+const db = isServerRuntime && dbUrl ? neon(dbUrl) : null;
 
 const UPLOADED_FOLDER = 'uploaded';
 const GENERATED_FOLDER = 'generated';
@@ -84,10 +90,19 @@ const GENERATED_FOLDER = 'generated';
 // Helper function to execute SQL queries
 async function executeQuery<T>(query: string, params: unknown[] = []): Promise<T[]> {
   if (!db) {
-    return getMockResult('query') as T[];
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Using mock data in development. Set DATABASE_URL to use a real database.');
+      return getMockResult('query') as T[];
+    }
+    throw new Error('Database connection not available. Please check DATABASE_URL environment variable.');
   }
-  const result = await db(query, params);
-  return result as T[];
+  try {
+    const result = await db(query, params);
+    return result as T[];
+  } catch (error) {
+    console.error('Database query error:', error);
+    throw new Error(`Database query failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 // Helper function to upload file to storage

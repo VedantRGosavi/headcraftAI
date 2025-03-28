@@ -2,6 +2,10 @@
 import OpenAI from 'openai';
 import { GenerationPreference } from '../types/image';
 
+if (!process.env.OPENAI_API_KEY) {
+  console.error('OPENAI_API_KEY environment variable is not set');
+}
+
 // Initialize the OpenAI client with API key
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -13,6 +17,10 @@ const openai = new OpenAI({
  * @returns The generated base description
  */
 export async function analyzeImages(imageUrls: string[]): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.');
+  }
+
   try {
     const messages = [
       {
@@ -32,15 +40,27 @@ export async function analyzeImages(imageUrls: string[]): Promise<string> {
     ];
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4-vision-preview',
       messages,
       max_tokens: 500,
     });
 
-    return response.choices[0].message.content || '';
+    if (!response.choices[0]?.message?.content) {
+      throw new Error('No response content received from OpenAI');
+    }
+
+    return response.choices[0].message.content;
   } catch (error) {
     console.error('Error analyzing images with OpenAI:', error);
-    throw new Error('Failed to analyze images');
+    if (error instanceof Error) {
+      if (error.message.includes('API key')) {
+        throw new Error('OpenAI API key is invalid or expired');
+      }
+      if (error.message.includes('rate limit')) {
+        throw new Error('OpenAI API rate limit exceeded. Please try again later.');
+      }
+    }
+    throw new Error('Failed to analyze images: ' + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
 
@@ -54,6 +74,10 @@ export async function generateHeadshotPrompt(
   baseDescription: string,
   preferences: GenerationPreference
 ): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.');
+  }
+
   try {
     const prefString = JSON.stringify(preferences);
     
@@ -69,15 +93,27 @@ export async function generateHeadshotPrompt(
     ];
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4',
       messages,
       max_tokens: 500,
     });
 
-    return response.choices[0].message.content || '';
+    if (!response.choices[0]?.message?.content) {
+      throw new Error('No response content received from OpenAI');
+    }
+
+    return response.choices[0].message.content;
   } catch (error) {
     console.error('Error generating headshot prompt with OpenAI:', error);
-    throw new Error('Failed to generate headshot prompt');
+    if (error instanceof Error) {
+      if (error.message.includes('API key')) {
+        throw new Error('OpenAI API key is invalid or expired');
+      }
+      if (error.message.includes('rate limit')) {
+        throw new Error('OpenAI API rate limit exceeded. Please try again later.');
+      }
+    }
+    throw new Error('Failed to generate headshot prompt: ' + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
 
@@ -87,6 +123,10 @@ export async function generateHeadshotPrompt(
  * @returns The URL of the generated image
  */
 export async function generateHeadshot(prompt: string): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.');
+  }
+
   try {
     const response = await openai.images.generate({
       model: 'dall-e-3',
@@ -97,10 +137,25 @@ export async function generateHeadshot(prompt: string): Promise<string> {
       style: 'natural',
     });
 
-    return response.data[0].url || '';
+    if (!response.data[0]?.url) {
+      throw new Error('No image URL received from DALL-E');
+    }
+
+    return response.data[0].url;
   } catch (error) {
     console.error('Error generating headshot with DALL-E 3:', error);
-    throw new Error('Failed to generate headshot');
+    if (error instanceof Error) {
+      if (error.message.includes('API key')) {
+        throw new Error('OpenAI API key is invalid or expired');
+      }
+      if (error.message.includes('rate limit')) {
+        throw new Error('OpenAI API rate limit exceeded. Please try again later.');
+      }
+      if (error.message.includes('content policy')) {
+        throw new Error('The generated prompt violates OpenAI content policy');
+      }
+    }
+    throw new Error('Failed to generate headshot: ' + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
 

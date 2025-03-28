@@ -1,18 +1,27 @@
 // lib/stripe.ts
 import Stripe from 'stripe';
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY!;
+if (!process.env.STRIPE_SECRET_KEY) {
+  console.error('STRIPE_SECRET_KEY environment variable is not set');
+}
+
+if (!process.env.NEXT_PUBLIC_BASE_URL) {
+  console.error('NEXT_PUBLIC_BASE_URL environment variable is not set');
+}
+
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
 // Initialize Stripe with the secret key
-const stripe = new Stripe(stripeSecretKey, {
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
   apiVersion: '2025-02-24.acacia', // Use the latest API version
-});
+}) : null;
 
 /**
  * Constants for product prices
+ * Note: These should be moved to environment variables in production
  */
 export const PRICES = {
-  HEADSHOT_GENERATION: 'price_1R7chHK9ng7JDxkssJ8d6c7z', // Basic tier price ID
+  HEADSHOT_GENERATION: process.env.STRIPE_PRICE_ID || 'price_1R7chHK9ng7JDxkssJ8d6c7z', // Basic tier price ID
 };
 
 /**
@@ -22,6 +31,14 @@ export const PRICES = {
  * @returns The checkout session URL
  */
 export async function createCheckoutSession(userId: string, headshotId: string): Promise<string> {
+  if (!stripe) {
+    throw new Error('Stripe is not initialized. Please check STRIPE_SECRET_KEY environment variable.');
+  }
+
+  if (!process.env.NEXT_PUBLIC_BASE_URL) {
+    throw new Error('NEXT_PUBLIC_BASE_URL environment variable is not set');
+  }
+
   try {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -40,10 +57,22 @@ export async function createCheckoutSession(userId: string, headshotId: string):
       },
     });
 
-    return session.url || '';
+    if (!session.url) {
+      throw new Error('Failed to create checkout session URL');
+    }
+
+    return session.url;
   } catch (error) {
     console.error('Error creating Stripe checkout session:', error);
-    throw new Error('Failed to create checkout session');
+    if (error instanceof Error) {
+      if (error.message.includes('price')) {
+        throw new Error('Invalid price ID. Please check STRIPE_PRICE_ID environment variable.');
+      }
+      if (error.message.includes('authentication')) {
+        throw new Error('Stripe authentication failed. Please check STRIPE_SECRET_KEY.');
+      }
+    }
+    throw new Error('Failed to create checkout session: ' + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
 
@@ -57,6 +86,10 @@ export async function verifyPayment(sessionId: string): Promise<{
   headshotId: string;
   paid: boolean;
 }> {
+  if (!stripe) {
+    throw new Error('Stripe is not initialized. Please check STRIPE_SECRET_KEY environment variable.');
+  }
+
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     
@@ -68,14 +101,26 @@ export async function verifyPayment(sessionId: string): Promise<{
       };
     }
 
+    if (!session.metadata?.userId || !session.metadata?.headshotId) {
+      throw new Error('Missing metadata in Stripe session');
+    }
+
     return {
-      userId: session.metadata?.userId || '',
-      headshotId: session.metadata?.headshotId || '',
+      userId: session.metadata.userId,
+      headshotId: session.metadata.headshotId,
       paid: true,
     };
   } catch (error) {
     console.error('Error verifying payment with Stripe:', error);
-    throw new Error('Failed to verify payment');
+    if (error instanceof Error) {
+      if (error.message.includes('authentication')) {
+        throw new Error('Stripe authentication failed. Please check STRIPE_SECRET_KEY.');
+      }
+      if (error.message.includes('session')) {
+        throw new Error('Invalid session ID or session not found.');
+      }
+    }
+    throw new Error('Failed to verify payment: ' + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
 

@@ -14,6 +14,7 @@ const DashboardContent = () => {
   const [headshots, setHeadshots] = useState<HeadshotWithImages[]>([]);
   const [loading, setLoading] = useState(true);
   const [preferences, setPreferences] = useState('');
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     // Load user's images and headshots when component mounts
@@ -59,6 +60,51 @@ const DashboardContent = () => {
       setUploadedImages(images);
     } catch (error) {
       console.error('Error reloading uploaded images:', error);
+    }
+  };
+
+  const handleGenerateHeadshot = async () => {
+    if (!user) {
+      alert('Please log in to generate headshots');
+      return;
+    }
+    
+    setGenerating(true);
+    try {
+      // Call the generate API with the selected images and preferences
+      const response = await fetch('/api/upload/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageIds: uploadedImages.map(img => img.id),
+          preferences: {
+            prompt: preferences
+          }
+        }),
+        credentials: 'include', // This will include cookies in the request
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate headshot');
+      }
+
+      // Redirect to checkout if needed
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        // Refresh the headshots list
+        const userHeadshots = await getUserHeadshots(user.id);
+        setHeadshots(userHeadshots);
+      }
+    } catch (error) {
+      console.error('Error generating headshot:', error);
+      alert('Failed to generate headshot. Please try again.');
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -131,38 +177,15 @@ const DashboardContent = () => {
             </div>
             <div className="flex justify-end">
               <button
-                onClick={() => {
-                  // Call the generate API with the selected images and preferences
-                  fetch('/api/upload/generate', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      imageIds: uploadedImages.map(img => img.id),
-                      preferences: {
-                        prompt: preferences
-                      }
-                    }),
-                  })
-                  .then(async (response) => {
-                    const data = await response.json();
-                    if (!response.ok) {
-                      throw new Error(data.error || 'Failed to generate headshot');
-                    }
-                    // Redirect to checkout if needed
-                    if (data.checkoutUrl) {
-                      window.location.href = data.checkoutUrl;
-                    }
-                  })
-                  .catch((error) => {
-                    console.error('Error generating headshot:', error);
-                    alert('Failed to generate headshot. Please try again.');
-                  });
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                onClick={handleGenerateHeadshot}
+                disabled={generating || !uploadedImages.length}
+                className={`px-4 py-2 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                  generating || !uploadedImages.length
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
-                Generate Headshot
+                {generating ? 'Generating...' : 'Generate Headshot'}
               </button>
             </div>
           </div>

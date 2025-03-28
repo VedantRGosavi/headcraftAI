@@ -21,7 +21,7 @@ function getMockResult<T extends keyof MockResult>(functionName: T): MockResult[
   
   const mockImage: Image = {
     id: 'mock-id',
-    url: 'https://example.com/mock-image.jpg',
+    url: 'https://placehold.co/400x300',
     type: 'uploaded',
     created_at: new Date().toISOString(),
     user_id: 'mock-user-id'

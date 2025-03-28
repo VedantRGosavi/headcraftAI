@@ -3,9 +3,9 @@ import { neon } from '@neondatabase/serverless';
 import { Image, HeadshotWithImages } from '@/types/image';
 import { getCurrentSession } from '@/lib/auth';
 
-const dbUrl = process.env.DATABASE_URL;
+const dbUrl = process.env.NEON_DATABASE_URL;
 if (!dbUrl) {
-  throw new Error('DATABASE_URL environment variable is not set');
+  throw new Error('NEON_DATABASE_URL environment variable is not set');
 }
 
 const db = neon(dbUrl);

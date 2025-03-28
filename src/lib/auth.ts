@@ -64,9 +64,14 @@ export async function signOut(): Promise<void> {
  * @returns The current user or null if not signed in
  */
 export async function getCurrentSession(): Promise<User | null> {
-  // This would typically come from a session cookie or token
-  // For now, return null to indicate no user is signed in
-  return null;
+  try {
+    const { stackServerApp } = await import('../stack');
+    const user = await stackServerApp.getUser();
+    return user;
+  } catch (error) {
+    console.error('Error getting current session:', error);
+    return null;
+  }
 }
 
 /**

@@ -7,7 +7,7 @@ import { GenerationPreference } from '../../../../types/image';
 
 // Check required environment variables
 const requiredEnvVars = [
-  'DATABASE_URL',
+  'NEON_DATABASE_URL',
   'OPENAI_API_KEY',
   'STRIPE_SECRET_KEY',
   'NEXT_PUBLIC_BASE_URL'
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     // Validate that imageIds belong to the user
     let uploadedImages;
     try {
-      uploadedImages = await getUserUploadedImages(userId);
+      uploadedImages = await getUserUploadedImages();
     } catch (error) {
       console.error('Error fetching user images:', error);
       return NextResponse.json(

@@ -30,11 +30,11 @@ const DashboardContent = () => {
         setLoading(true);
         setError(null);
         const [images, userHeadshots] = await Promise.all([
-          getUserUploadedImages(user.id).catch((err) => {
+          getUserUploadedImages().catch((err) => {
             console.error('Error loading uploaded images:', err);
             return [];
           }),
-          getUserHeadshots(user.id).catch((err) => {
+          getUserHeadshots().catch((err) => {
             console.error('Error loading headshots:', err);
             return [];
           }),
@@ -58,7 +58,7 @@ const DashboardContent = () => {
   const handleImagesUploaded = async () => {
     if (!user) return;
     try {
-      const images = await getUserUploadedImages(user.id);
+      const images = await getUserUploadedImages();
       setUploadedImages(images);
     } catch (error) {
       console.error('Error reloading uploaded images:', error);
@@ -96,7 +96,7 @@ const DashboardContent = () => {
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else {
-        const userHeadshots = await getUserHeadshots(user.id);
+        const userHeadshots = await getUserHeadshots();
         setHeadshots(userHeadshots);
       }
     } catch (error) {

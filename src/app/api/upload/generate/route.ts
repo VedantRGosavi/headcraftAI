@@ -7,7 +7,7 @@ import { GenerationPreference } from '../../../../types/image';
 
 export async function POST(req: Request) {
   try {
-    // Check auth using Stack
+    // Check authentication using Stack
     const user = await stackServerApp.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
 
     const userId = user.id;
 
+    // Parse and validate request body
     const body = await req.json();
     const { imageIds, preferences = {} } = body as {
       imageIds: string[];
@@ -25,25 +26,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No image IDs provided' }, { status: 400 });
     }
 
+    // Validate that imageIds belong to the user
+    const uploadedImages = await getUserUploadedImages(userId);
+    const selectedImages = uploadedImages.filter((img) => imageIds.includes(img.id));
+
+    if (selectedImages.length !== imageIds.length) {
+      return NextResponse.json(
+        { error: 'One or more image IDs are invalid or unauthorized' },
+        { status: 400 }
+      );
+    }
+
     // Create a headshot record
     const headshot = await createHeadshot(userId);
 
-    // Get image URLs from the database
-    const uploadedImages = await getUserUploadedImages(userId);
-    const selectedImages = uploadedImages.filter(img => imageIds.includes(img.id));
+    const imageUrls = selectedImages.map((img) => img.url);
 
-    if (selectedImages.length === 0) {
-      return NextResponse.json({ error: 'No valid images found' }, { status: 400 });
-    }
+    // Start the generation process in the background with a timeout
+    const generationPromise = generateHeadshotProcess(userId, headshot.id, imageUrls, preferences);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Headshot generation timed out')), 60000) // 60-second timeout
+    );
 
-    const imageUrls = selectedImages.map(img => img.url);
-
-    // Start the generation process in the background
-    generateHeadshotProcess(userId, headshot.id, imageUrls, preferences).catch(error => {
-      console.error('Error in headshot generation process:', error);
-      updateHeadshot(headshot.id, { status: 'failed' }).catch(err => {
-        console.error('Error updating failed headshot status:', err);
-      });
+    Promise.race([generationPromise, timeoutPromise]).catch(async (error) => {
+      console.error('Background headshot generation failed:', error instanceof Error ? error.message : 'Unknown error');
+      await updateHeadshot(headshot.id, { status: 'failed' });
     });
 
     // Create a checkout session for payment
@@ -51,9 +58,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ checkoutUrl });
   } catch (error) {
-    console.error('Error in headshot generation:', error);
+    console.error('Error initiating headshot generation:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json(
-      { error: 'Failed to generate headshot' },
+      { error: 'Failed to initiate headshot generation' },
       { status: 500 }
     );
   }
@@ -68,6 +75,7 @@ async function generateHeadshotProcess(
   try {
     // Update status to processing
     await updateHeadshot(headshotId, { status: 'processing' });
+    console.log(`Headshot ${headshotId} processing started for user ${userId}`);
 
     // Analyze images and generate base description
     const baseDescription = await analyzeImages(imageUrls);
@@ -83,9 +91,10 @@ async function generateHeadshotProcess(
 
     // Update status to completed
     await updateHeadshot(headshotId, { status: 'completed' });
+    console.log(`Headshot ${headshotId} completed for user ${userId}`);
   } catch (error) {
-    console.error('Error in headshot generation process:', error);
+    console.error(`Error generating headshot ${headshotId}:`, error instanceof Error ? error.message : 'Unknown error');
     await updateHeadshot(headshotId, { status: 'failed' });
-    throw error;
+    throw error; // Re-throw to ensure the timeout catch block triggers
   }
-} 
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { User } from '../types/user';
 import { FiUpload, FiDownload } from 'react-icons/fi';
 
@@ -87,11 +88,15 @@ const DashboardContent: React.FC<DashboardContentProps> = () => {
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {generatedImages.map((image, index) => (
               <div key={index} className="relative">
-                <img
-                  src={image}
-                  alt={`Generated headshot ${index + 1}`}
-                  className="w-full h-48 object-cover rounded-lg"
-                />
+                <div className="relative w-full h-48">
+                  <Image
+                    src={image}
+                    alt={`Generated headshot ${index + 1}`}
+                    fill
+                    style={{ objectFit: "cover" }}
+                    className="rounded-lg"
+                  />
+                </div>
                 <button className="absolute bottom-2 right-2 p-2 bg-white rounded-full shadow hover:bg-gray-50">
                   <FiDownload className="h-5 w-5 text-gray-600" />
                 </button>

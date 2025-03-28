@@ -1,44 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stackServerApp } from '../../../../stack';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-
-// Validate required environment variables
-const requiredEnvVars = {
-  AWS_REGION: process.env.AWS_REGION,
-  AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
-  AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
-  AWS_S3_BUCKET: process.env.AWS_S3_BUCKET,
-};
-
-// Check for missing environment variables
-const missingEnvVars = Object.entries(requiredEnvVars)
-  .filter(([, value]) => !value)
-  .map(([key]) => key);
-
-if (missingEnvVars.length > 0) {
-  console.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
-}
-
-// Initialize S3 client only if all credentials are present
-const s3Client = missingEnvVars.length === 0 ? new S3Client({
-  region: process.env.AWS_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-}) : null;
+import { put } from '@vercel/blob';
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if S3 client is properly initialized
-    if (!s3Client) {
-      console.error('S3 client not initialized due to missing configuration');
-      return NextResponse.json(
-        { error: 'Storage service not properly configured' },
-        { status: 500 }
-      );
-    }
-
     // Get the current user
     const user = await stackServerApp.getUser();
     if (!user) {
@@ -79,29 +44,18 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Convert file to buffer
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      // Upload to S3
-      const command = new PutObjectCommand({
-        Bucket: process.env.AWS_S3_BUCKET!,
-        Key: path,
-        Body: buffer,
-        ContentType: file.type,
-        ACL: 'public-read',
+      // Upload to Vercel Blob
+      const blob = await put(path, file, {
+        access: 'public',
+        contentType: file.type,
+        addRandomSuffix: true // This helps prevent naming conflicts
       });
 
-      await s3Client.send(command);
-
-      // Return the public URL
-      const url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${path}`;
-
-      return NextResponse.json({ url });
+      return NextResponse.json({ url: blob.url });
     } catch (uploadError) {
-      console.error('S3 upload error:', uploadError);
+      console.error('Blob storage upload error:', uploadError);
       return NextResponse.json(
-        { error: 'Failed to upload file to S3' },
+        { error: 'Failed to upload file to storage' },
         { status: 500 }
       );
     }

@@ -10,7 +10,8 @@ const nextConfig = {
   webpack: (config) => {
     config.optimization.minimize = true;
     return config;
-  }
+  },
+  output: 'standalone'
 };
 
 module.exports = nextConfig; 

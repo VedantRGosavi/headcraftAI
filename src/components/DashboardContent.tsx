@@ -2,14 +2,9 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { User } from '../types/user';
 import { FiUpload, FiDownload } from 'react-icons/fi';
 
-interface DashboardContentProps {
-  user: User;
-}
-
-const DashboardContent: React.FC<DashboardContentProps> = () => {
+const DashboardContent = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);

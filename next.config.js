@@ -5,7 +5,7 @@ const nextConfig = {
     domains: ['*']
   },
   experimental: {
-    optimizeCss: true
+    scrollRestoration: true
   },
   webpack: (config) => {
     config.optimization.minimize = true;

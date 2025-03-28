@@ -8,49 +8,41 @@ import "./globals.css";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "headcraftai",
   description: "Your AI-powered visual content creation studio",
   icons: {
-    icon: [
-      { url: '/favicon/icon.svg' }
-    ],
-    apple: [
-      { url: '/favicon/icon.svg' }
-    ]
+    icon: [{ url: "/favicon/icon.svg" }],
+    apple: [{ url: "/favicon/icon.svg" }],
   },
-  manifest: '/manifest.json',
+  manifest: "/manifest.json",
 };
 
 export const viewport: Viewport = {
-  themeColor: '#33B9F2',
+  themeColor: "#33B9F2",
+  width: "device-width",
+  initialScale: 1,
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
+interface RootLayoutProps {
   children: React.ReactNode;
-}>) {
+}
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="icon" href="/favicon/icon.svg" />
-        <link rel="apple-touch-icon" href="/favicon/icon.svg" />
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className="antialiased">
         <StackProvider app={stackServerApp}>
-          <StackTheme>
-            {children}
-          </StackTheme>
+          <StackTheme>{children}</StackTheme>
         </StackProvider>
       </body>
     </html>

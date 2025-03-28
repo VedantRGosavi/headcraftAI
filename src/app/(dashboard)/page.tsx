@@ -1,37 +1,18 @@
 'use client';
 
-// src/app/(dashboard)/dashboard.tsx
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useUser } from '@stackframe/stack';
+import { Suspense } from 'react';
 import Layout from '../../components/layout';
 import DashboardContent from '../../components/DashboardContent';
 
-const Dashboard = () => {
-  const router = useRouter();
-  const user = useUser();
-  const [loading, setLoading] = useState(true);
+// Add export const dynamic to force dynamic rendering instead of static prerendering
+export const dynamic = 'force-dynamic';
 
-  useEffect(() => {
-    if (!user && !loading) {
-      router.push('/login');
-    }
-    setLoading(false);
-  }, [user, loading, router]);
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
-  if (!user) {
-    return null;
-  }
-
+export default function DashboardPage() {
   return (
-    <Layout user={user} loading={loading} title="Dashboard - headcraftAI">
-      <DashboardContent user={user} />
-    </Layout>
+    <Suspense fallback={<div>Loading...</div>}>
+      <Layout title="Dashboard - headcraftAI">
+        <DashboardContent />
+      </Layout>
+    </Suspense>
   );
-};
-
-export default Dashboard;
+}

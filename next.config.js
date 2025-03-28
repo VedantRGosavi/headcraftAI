@@ -4,7 +4,18 @@ const nextConfig = {
     domains: ['localhost'],
     unoptimized: process.env.NODE_ENV === 'development'
   },
-  /* config options here */
+  output: 'standalone',
+  poweredByHeader: false,
+  reactStrictMode: true,
+  swcMinify: true,
+  compress: true,
+  productionBrowserSourceMaps: false,
+  experimental: {
+    optimizeCss: true,
+    turbotrace: {
+      logLevel: 'error'
+    }
+  }
 };
 
 module.exports = nextConfig; 

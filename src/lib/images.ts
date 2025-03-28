@@ -3,7 +3,37 @@ import { v4 as uuidv4 } from 'uuid';
 import { neon } from '@neondatabase/serverless';
 import { Image, Headshot, HeadshotWithImages } from '../types/image';
 
-const sql = neon(process.env.DATABASE_URL!);
+// Helper function to get a mock result based on function name
+function getMockResult(functionName: string): any {
+  console.log(`Using mock for ${functionName}`);
+  
+  switch (functionName) {
+    case 'uploadImage':
+    case 'storeGeneratedImage':
+      return { id: 'mock-id', url: 'https://example.com/mock-image.jpg', type: 'uploaded', created_at: new Date().toISOString() };
+    case 'createHeadshot':
+    case 'updateHeadshot':
+      return { id: 'mock-headshot-id', status: 'completed', created_at: new Date().toISOString() };
+    case 'getHeadshotWithImages':
+      return { 
+        id: 'mock-headshot-id', 
+        status: 'completed', 
+        created_at: new Date().toISOString(),
+        generated_image: { id: 'mock-image-id', url: 'https://example.com/mock-image.jpg' },
+        uploaded_images: []
+      };
+    case 'getUserHeadshots':
+    case 'getUserUploadedImages':
+      return [];
+    default:
+      return {};
+  }
+}
+
+// Use a real database connection only in production runtime
+const isServerRuntime = process.env.NODE_ENV === 'production' && typeof window === 'undefined' && process.env.VERCEL_ENV;
+const sql = isServerRuntime ? neon(process.env.DATABASE_URL || '') : null;
+
 const UPLOADED_FOLDER = 'uploaded';
 const GENERATED_FOLDER = 'generated';
 

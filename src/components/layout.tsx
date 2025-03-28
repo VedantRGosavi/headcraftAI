@@ -3,7 +3,7 @@ import React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { FiCamera, FiUser, FiLogOut, FiGrid } from 'react-icons/fi';
+import { FiCamera, FiLogOut, FiGrid } from 'react-icons/fi';
 import { User } from '../types/user';
 import { signOut } from '../lib/auth';
 import { toast } from 'react-hot-toast';
@@ -64,21 +64,16 @@ const Layout: React.FC<LayoutProps> = ({
                 <div className="animate-pulse h-8 w-20 bg-gray-200 rounded"></div>
               ) : user ? (
                 <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-600">
+                    {user.email}
+                  </span>
+                  
                   <Link href="/dashboard">
                     <span className={`px-3 py-2 rounded-md text-sm font-medium ${
                       pathname === '/dashboard' ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
                     }`}>
                       <FiGrid className="inline-block mr-1" />
                       Dashboard
-                    </span>
-                  </Link>
-                  
-                  <Link href="/profile">
-                    <span className={`px-3 py-2 rounded-md text-sm font-medium ${
-                      pathname === '/profile' ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
-                    }`}>
-                      <FiUser className="inline-block mr-1" />
-                      Profile
                     </span>
                   </Link>
                   

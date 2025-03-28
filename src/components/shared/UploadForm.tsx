@@ -23,6 +23,7 @@ const UploadForm: React.FC<UploadFormProps> = ({
 }) => {
   const currentUser = useUser();
   const [images, setImages] = useState<UploadedImage[]>([]);
+  const [uploadedUrls, setUploadedUrls] = useState<{id: string, url: string}[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,14 +93,21 @@ const UploadForm: React.FC<UploadFormProps> = ({
         .map(async (image) => {
           try {
             const uploadedImage = await uploadImage(image.file, currentUser.id);
-            return uploadedImage.id;
+            return uploadedImage;
           } catch (error) {
             console.error('Error uploading image:', error);
             throw error;
           }
         });
 
-      const uploadedImageIds = await Promise.all(uploadPromises);
+      const uploadedImages = await Promise.all(uploadPromises);
+      const uploadedImageIds = uploadedImages.map(img => img.id);
+      
+      // Store the uploaded URLs for display
+      setUploadedUrls(prev => [
+        ...prev,
+        ...uploadedImages.map(img => ({ id: img.id, url: img.url }))
+      ]);
       
       // Update local state to mark images as uploaded
       setImages(prev => prev.map(image => ({ ...image, uploaded: true })));
@@ -165,6 +173,33 @@ const UploadForm: React.FC<UploadFormProps> = ({
                     <FiCheck />
                   </div>
                 )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Display uploaded images from server */}
+      {uploadedUrls.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-lg font-medium">Uploaded Images</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2">
+            {uploadedUrls.map((image, index) => (
+              <div key={image.id} className="relative rounded-lg overflow-hidden border border-gray-200">
+                <Image
+                  src={image.url}
+                  alt={`Uploaded image ${index + 1}`}
+                  width={300}
+                  height={160}
+                  className="w-full h-40 object-cover"
+                  style={{
+                    maxWidth: '100%',
+                    height: '160px',
+                  }}
+                />
+                <div className="absolute bottom-2 right-2 p-1 rounded-full bg-green-500 text-white">
+                  <FiCheck />
+                </div>
               </div>
             ))}
           </div>

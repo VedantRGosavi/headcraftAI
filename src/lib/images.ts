@@ -1,109 +1,9 @@
 // lib/images.ts
 import { v4 as uuidv4 } from 'uuid';
-import { neon } from '@neondatabase/serverless';
 import { Image, Headshot, HeadshotWithImages } from '../types/image';
-import { del } from '@vercel/blob';
-
-type MockResult = {
-  uploadImage: Image;
-  storeGeneratedImage: Image;
-  createHeadshot: Headshot;
-  updateHeadshot: Headshot;
-  getHeadshotWithImages: HeadshotWithImages;
-  getUserHeadshots: HeadshotWithImages[];
-  getUserUploadedImages: Image[];
-  query: Image[];
-};
-
-// Helper function to get a mock result based on function name
-function getMockResult<T extends keyof MockResult>(functionName: T): MockResult[T] {
-  console.log(`Using mock for ${functionName}`);
-  
-  const mockImage: Image = {
-    id: 'mock-id',
-    url: 'https://placehold.co/400x300',
-    type: 'uploaded',
-    created_at: new Date().toISOString(),
-    user_id: 'mock-user-id'
-  };
-
-  const mockHeadshot: Headshot = {
-    id: 'mock-headshot-id',
-    status: 'completed',
-    created_at: new Date().toISOString(),
-    user_id: 'mock-user-id',
-    prompt: '',
-    generated_image_id: null,
-    updated_at: new Date().toISOString()
-  };
-
-  const mockHeadshotWithImages: HeadshotWithImages = {
-    id: 'mock-headshot-id',
-    status: 'completed',
-    created_at: new Date().toISOString(),
-    user_id: 'mock-user-id',
-    prompt: '',
-    generated_image_id: 'mock-image-id',
-    updated_at: new Date().toISOString(),
-    generated_image: { 
-      id: 'mock-image-id',
-      url: 'https://example.com/mock-generated.jpg',
-      type: 'generated',
-      created_at: new Date().toISOString(),
-      user_id: 'mock-user-id'
-    },
-    uploaded_images: []
-  };
-
-  switch (functionName) {
-    case 'uploadImage':
-    case 'storeGeneratedImage':
-      return mockImage as MockResult[T];
-    case 'createHeadshot':
-    case 'updateHeadshot':
-      return mockHeadshot as MockResult[T];
-    case 'getHeadshotWithImages':
-      return mockHeadshotWithImages as MockResult[T];
-    case 'getUserHeadshots':
-      return [mockHeadshotWithImages] as MockResult[T];
-    case 'getUserUploadedImages':
-      return [mockImage] as MockResult[T];
-    case 'query':
-    default:
-      return [mockImage] as MockResult[T];
-  }
-}
-
-// Use a real database connection only in production runtime
-const isServerRuntime = typeof window === 'undefined';
-const dbUrl = process.env.DATABASE_URL;
-
-if (isServerRuntime && !dbUrl) {
-  console.error('DATABASE_URL environment variable is not set');
-}
-
-const db = isServerRuntime && dbUrl ? neon(dbUrl) : null;
 
 const UPLOADED_FOLDER = 'uploaded';
 const GENERATED_FOLDER = 'generated';
-
-// Helper function to execute SQL queries
-async function executeQuery<T>(query: string, params: unknown[] = []): Promise<T[]> {
-  if (!db) {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('Using mock data in development. Set DATABASE_URL to use a real database.');
-      return getMockResult('query') as T[];
-    }
-    throw new Error('Database connection not available. Please check DATABASE_URL environment variable.');
-  }
-  try {
-    const result = await db(query, params);
-    return result as T[];
-  } catch (error) {
-    console.error('Database query error:', error);
-    throw new Error(`Database query failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
 
 // Helper function to upload file to storage
 async function uploadFileToStorage(file: File | Blob, filePath: string): Promise<string> {
@@ -150,13 +50,24 @@ export async function uploadImage(file: File, userId: string): Promise<Image> {
     // Upload file to storage
     const publicUrl = await uploadFileToStorage(file, filePath);
 
-    // Insert record in the database
-    const result = await executeQuery<Image>(
-      'INSERT INTO images (user_id, type, url) VALUES ($1, $2, $3) RETURNING *',
-      [userId, 'uploaded', publicUrl]
-    );
+    // Store image record through API
+    const response = await fetch('/api/images', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'uploadImage',
+        url: publicUrl,
+        type: 'uploaded',
+      }),
+    });
 
-    return result[0];
+    if (!response.ok) {
+      throw new Error('Failed to store image record');
+    }
+
+    return await response.json();
   } catch (error) {
     console.error('Error in uploadImage:', error);
     throw error;
@@ -184,13 +95,24 @@ export async function storeGeneratedImage(imageUrl: string, userId: string): Pro
     // Upload file to storage
     const publicUrl = await uploadFileToStorage(imageBlob, filePath);
 
-    // Insert record in the database
-    const result = await executeQuery<Image>(
-      'INSERT INTO images (user_id, type, url) VALUES ($1, $2, $3) RETURNING *',
-      [userId, 'generated', publicUrl]
-    );
+    // Store image record through API
+    const apiResponse = await fetch('/api/images', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'storeGeneratedImage',
+        url: publicUrl,
+        type: 'generated',
+      }),
+    });
 
-    return result[0];
+    if (!apiResponse.ok) {
+      throw new Error('Failed to store generated image record');
+    }
+
+    return await apiResponse.json();
   } catch (error) {
     console.error('Error in storeGeneratedImage:', error);
     throw error;
@@ -198,18 +120,26 @@ export async function storeGeneratedImage(imageUrl: string, userId: string): Pro
 }
 
 /**
- * Create a new headshot record
- * @param userId The ID of the user
- * @returns The created headshot record
+ * Create a new headshot
+ * @returns The created headshot
  */
-export async function createHeadshot(userId: string): Promise<Headshot> {
+export async function createHeadshot(): Promise<Headshot> {
   try {
-    const result = await executeQuery<Headshot>(
-      'INSERT INTO headshots (user_id, status) VALUES ($1, $2) RETURNING *',
-      [userId, 'pending']
-    );
+    const response = await fetch('/api/images', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'createHeadshot',
+      }),
+    });
 
-    return result[0];
+    if (!response.ok) {
+      throw new Error('Failed to create headshot');
+    }
+
+    return await response.json();
   } catch (error) {
     console.error('Error in createHeadshot:', error);
     throw error;
@@ -217,10 +147,10 @@ export async function createHeadshot(userId: string): Promise<Headshot> {
 }
 
 /**
- * Update a headshot record
- * @param headshotId The ID of the headshot
+ * Update a headshot
+ * @param headshotId The ID of the headshot to update
  * @param updates The updates to apply
- * @returns The updated headshot record
+ * @returns The updated headshot
  */
 export async function updateHeadshot(
   headshotId: string,
@@ -231,12 +161,23 @@ export async function updateHeadshot(
   }
 ): Promise<Headshot> {
   try {
-    const result = await executeQuery<Headshot>(
-      'UPDATE headshots SET status = COALESCE($1, status), prompt = COALESCE($2, prompt), generated_image_id = COALESCE($3, generated_image_id), updated_at = NOW() WHERE id = $4 RETURNING *',
-      [updates.status, updates.prompt, updates.generated_image_id, headshotId]
-    );
+    const response = await fetch('/api/images', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'updateHeadshot',
+        headshotId,
+        updates,
+      }),
+    });
 
-    return result[0];
+    if (!response.ok) {
+      throw new Error('Failed to update headshot');
+    }
+
+    return await response.json();
   } catch (error) {
     console.error('Error in updateHeadshot:', error);
     throw error;
@@ -244,29 +185,21 @@ export async function updateHeadshot(
 }
 
 /**
- * Get a headshot with associated images
+ * Get a headshot with its associated images
  * @param headshotId The ID of the headshot
- * @param userId The ID of the user
- * @returns The headshot with associated images
+ * @returns The headshot with its images
  */
-export async function getHeadshotWithImages(headshotId: string, userId: string): Promise<HeadshotWithImages> {
+export async function getHeadshotWithImages(headshotId: string): Promise<HeadshotWithImages> {
   try {
-    // Get the headshot with its generated image
-    const headshot = await executeQuery<HeadshotWithImages>(
-      'SELECT h.*, g.* as generated_image FROM headshots h LEFT JOIN images g ON h.generated_image_id = g.id WHERE h.id = $1 AND h.user_id = $2',
-      [headshotId, userId]
-    );
+    const response = await fetch(`/api/images?action=getHeadshotWithImages&headshotId=${headshotId}`, {
+      method: 'GET',
+    });
 
-    // Get uploaded images for the user
-    const uploadedImages = await executeQuery<Image>(
-      'SELECT * FROM images WHERE user_id = $1 AND type = $2',
-      [userId, 'uploaded']
-    );
+    if (!response.ok) {
+      throw new Error('Failed to get headshot with images');
+    }
 
-    return {
-      ...headshot[0],
-      uploaded_images: uploadedImages,
-    };
+    return await response.json();
   } catch (error) {
     console.error('Error in getHeadshotWithImages:', error);
     throw error;
@@ -275,17 +208,19 @@ export async function getHeadshotWithImages(headshotId: string, userId: string):
 
 /**
  * Get all headshots for a user
- * @param userId The ID of the user
- * @returns An array of headshots with their generated images
+ * @returns Array of headshots with their images
  */
-export async function getUserHeadshots(userId: string): Promise<HeadshotWithImages[]> {
+export async function getUserHeadshots(): Promise<HeadshotWithImages[]> {
   try {
-    const result = await executeQuery<HeadshotWithImages>(
-      'SELECT h.*, g.* as generated_image FROM headshots h LEFT JOIN images g ON h.generated_image_id = g.id WHERE h.user_id = $1 ORDER BY h.created_at DESC',
-      [userId]
-    );
+    const response = await fetch(`/api/images?action=getUserHeadshots`, {
+      method: 'GET',
+    });
 
-    return result;
+    if (!response.ok) {
+      throw new Error('Failed to get user headshots');
+    }
+
+    return await response.json();
   } catch (error) {
     console.error('Error in getUserHeadshots:', error);
     throw error;
@@ -294,16 +229,19 @@ export async function getUserHeadshots(userId: string): Promise<HeadshotWithImag
 
 /**
  * Get all uploaded images for a user
- * @param userId The ID of the user
- * @returns An array of uploaded images
+ * @returns Array of uploaded images
  */
-export async function getUserUploadedImages(userId: string): Promise<Image[]> {
+export async function getUserUploadedImages(): Promise<Image[]> {
   try {
-    const result = await executeQuery<Image>(
-      'SELECT * FROM images WHERE user_id = $1 AND type = $2 ORDER BY created_at DESC',
-      [userId, 'uploaded']
-    );
-    return result;
+    const response = await fetch(`/api/images?action=getUserUploadedImages`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get user uploaded images');
+    }
+
+    return await response.json();
   } catch (error) {
     console.error('Error in getUserUploadedImages:', error);
     throw error;
@@ -313,34 +251,23 @@ export async function getUserUploadedImages(userId: string): Promise<Image[]> {
 /**
  * Delete an image
  * @param imageId The ID of the image to delete
- * @param userId The ID of the user
- * @returns Success status
+ * @returns True if successful
  */
-export async function deleteImage(imageId: string, userId: string): Promise<boolean> {
+export async function deleteImage(imageId: string): Promise<boolean> {
   try {
-    // Get the image first to get its URL
-    const images = await executeQuery<Image>(
-      'SELECT * FROM images WHERE id = $1 AND user_id = $2',
-      [imageId, userId]
-    );
+    const response = await fetch(`/api/images`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        imageId,
+      }),
+    });
 
-    if (!images[0]) {
-      throw new Error('Image not found');
+    if (!response.ok) {
+      throw new Error('Failed to delete image');
     }
-
-    // Delete from Vercel Blob storage
-    try {
-      await del(images[0].url);
-    } catch (error) {
-      console.error('Error deleting from Blob storage:', error);
-      // Continue with database deletion even if storage deletion fails
-    }
-
-    // Delete from database
-    await executeQuery<Image>(
-      'DELETE FROM images WHERE id = $1 AND user_id = $2',
-      [imageId, userId]
-    );
 
     return true;
   } catch (error) {

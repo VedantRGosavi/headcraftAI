@@ -1,10 +1,9 @@
-// pages/api/upload/generate.ts
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../lib/neondb';
-import { analyzeImages, generateHeadshotPrompt, generateHeadshot } from '../../../lib/openai';
-import { createHeadshot, storeGeneratedImage, updateHeadshot, getUserUploadedImages } from '../../../lib/images';
-import { createCheckoutSession } from '../../../lib/stripe';
-import { GenerationPreference } from '../../../types/image';
+import { supabaseAdmin } from '../../../../lib/neondb';
+import { analyzeImages, generateHeadshotPrompt, generateHeadshot } from '../../../../lib/openai';
+import { createHeadshot, storeGeneratedImage, updateHeadshot, getUserUploadedImages } from '../../../../lib/images';
+import { createCheckoutSession } from '../../../../lib/stripe';
+import { GenerationPreference } from '../../../../types/image';
 
 export async function POST(req: Request) {
   try {
@@ -105,4 +104,4 @@ async function generateHeadshotProcess(
     
     throw error;
   }
-}
+} 

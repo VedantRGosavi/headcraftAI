@@ -7,6 +7,7 @@ import { FiCamera, FiLogOut, FiGrid } from 'react-icons/fi';
 import { User } from '../types/user';
 import { signOut } from '../lib/auth';
 import { toast } from 'react-hot-toast';
+import { useUser } from '@stackframe/stack';
 
 interface LayoutProps {
   title?: string;
@@ -18,11 +19,16 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({
   title = 'headcraftAI',
   children,
-  user,
-  loading = false,
+  user: propUser,
+  loading: propLoading = false,
 }) => {
   const router = useRouter();
   const pathname = usePathname();
+  const authUser = useUser();
+  
+  // Use prop user if provided, otherwise use auth user
+  const user = propUser || authUser;
+  const loading = propLoading;
 
   // Handle user sign out
   const handleSignOut = async () => {
@@ -85,7 +91,7 @@ const Layout: React.FC<LayoutProps> = ({
                     Sign Out
                   </button>
                 </div>
-              ) : (
+              ) : !loading && (
                 <div className="flex items-center space-x-2">
                   <Link href="/login">
                     <span className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-900">

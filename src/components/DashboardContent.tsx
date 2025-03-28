@@ -17,19 +17,31 @@ const DashboardContent = () => {
   useEffect(() => {
     // Load user's images and headshots when component mounts
     const loadUserData = async () => {
-      if (!user) return;
+      if (!user || !user.id) {
+        setLoading(false);
+        return;
+      }
       
       try {
         setLoading(true);
         const [images, userHeadshots] = await Promise.all([
-          getUserUploadedImages(user.id),
-          getUserHeadshots(user.id),
+          getUserUploadedImages(user.id).catch(err => {
+            console.error('Error loading uploaded images:', err);
+            return [];
+          }),
+          getUserHeadshots(user.id).catch(err => {
+            console.error('Error loading headshots:', err);
+            return [];
+          }),
         ]);
         
-        setUploadedImages(images);
-        setHeadshots(userHeadshots);
+        setUploadedImages(images || []);
+        setHeadshots(userHeadshots || []);
       } catch (error) {
         console.error('Error loading user data:', error);
+        // Set empty arrays to prevent null errors
+        setUploadedImages([]);
+        setHeadshots([]);
       } finally {
         setLoading(false);
       }

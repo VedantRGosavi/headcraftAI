@@ -12,25 +12,33 @@ const requiredEnvVars = {
 
 // Check for missing environment variables
 const missingEnvVars = Object.entries(requiredEnvVars)
-  .filter(([_, value]) => !value)
+  .filter(([, value]) => !value)
   .map(([key]) => key);
 
 if (missingEnvVars.length > 0) {
   console.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
-  throw new Error('Missing required AWS configuration');
 }
 
-// Initialize S3 client
-const s3Client = new S3Client({
+// Initialize S3 client only if all credentials are present
+const s3Client = missingEnvVars.length === 0 ? new S3Client({
   region: process.env.AWS_REGION!,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
-});
+}) : null;
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if S3 client is properly initialized
+    if (!s3Client) {
+      console.error('S3 client not initialized due to missing configuration');
+      return NextResponse.json(
+        { error: 'Storage service not properly configured' },
+        { status: 500 }
+      );
+    }
+
     // Get the current user
     const user = await stackServerApp.getUser();
     if (!user) {
@@ -72,7 +80,8 @@ export async function POST(request: NextRequest) {
 
     try {
       // Convert file to buffer
-      const buffer = Buffer.from(await file.arrayBuffer());
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
 
       // Upload to S3
       const command = new PutObjectCommand({

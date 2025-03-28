@@ -6,7 +6,7 @@ import HomeContent from '../components/HomeContent';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'headcraftAI - AI-Generated Professional Headshots',
+  title: 'headcraftAI | AI-Generated Professional Headshots',
   description: 'Get studio-quality headshots in minutes without a photographer. Upload your photos, and our AI does the rest.',
 };
 

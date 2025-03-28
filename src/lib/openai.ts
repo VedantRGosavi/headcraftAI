@@ -8,7 +8,7 @@ const openai = new OpenAI({
 });
 
 /**
- * Analyze user-uploaded images to generate a base description for DALL-E
+ * Analyze user-uploaded images to generate a base description for headshot generation
  * @param imageUrls Array of URLs to the uploaded images
  * @returns The generated base description
  */
@@ -32,7 +32,7 @@ export async function analyzeImages(imageUrls: string[]): Promise<string> {
     ];
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-vision-preview',
+      model: 'gpt-4o',
       messages,
       max_tokens: 500,
     });
@@ -45,10 +45,10 @@ export async function analyzeImages(imageUrls: string[]): Promise<string> {
 }
 
 /**
- * Generate a prompt for DALL-E based on user preferences and base description
+ * Generate a prompt for image generation based on user preferences and base description
  * @param baseDescription The base description generated from analyzing images
  * @param preferences User's preferences for the headshot
- * @returns The final prompt for DALL-E
+ * @returns The final prompt for image generation
  */
 export async function generateHeadshotPrompt(
   baseDescription: string,
@@ -60,16 +60,16 @@ export async function generateHeadshotPrompt(
     const messages = [
       {
         role: 'system' as const,
-        content: 'You are an expert at creating prompts for AI image generation. Your task is to take a base description of a person and their preferences for a headshot, and create a detailed prompt for DALL-E that will result in a realistic, professional headshot.',
+        content: 'You are an expert at creating prompts for AI image generation. Your task is to take a base description of a person and their preferences for a headshot, and create a detailed prompt that will result in a realistic, professional headshot.',
       },
       {
         role: 'user' as const,
-        content: `Base description: ${baseDescription}\n\nUser preferences: ${prefString}\n\nCreate a detailed prompt for DALL-E to generate a professional headshot.`,
+        content: `Base description: ${baseDescription}\n\nUser preferences: ${prefString}\n\nCreate a detailed prompt to generate a professional headshot.`,
       },
     ];
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
+      model: 'gpt-4o',
       messages,
       max_tokens: 500,
     });
@@ -82,8 +82,8 @@ export async function generateHeadshotPrompt(
 }
 
 /**
- * Generate a headshot using DALL-E based on the prompt
- * @param prompt The prompt for DALL-E
+ * Generate a headshot using DALL-E 3 based on the prompt
+ * @param prompt The prompt for image generation
  * @returns The URL of the generated image
  */
 export async function generateHeadshot(prompt: string): Promise<string> {
@@ -99,7 +99,7 @@ export async function generateHeadshot(prompt: string): Promise<string> {
 
     return response.data[0].url || '';
   } catch (error) {
-    console.error('Error generating headshot with DALL-E:', error);
+    console.error('Error generating headshot with DALL-E 3:', error);
     throw new Error('Failed to generate headshot');
   }
 }

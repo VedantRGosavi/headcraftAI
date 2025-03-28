@@ -1,10 +1,40 @@
 // lib/images.ts
 import { v4 as uuidv4 } from 'uuid';
-import { supabaseClient, supabaseAdmin, STORAGE_BUCKET, UPLOADED_FOLDER, GENERATED_FOLDER } from './supabase';
+import { neon } from '@neondatabase/serverless';
 import { Image, Headshot, HeadshotWithImages } from '../types/image';
 
+const sql = neon(process.env.DATABASE_URL!);
+const UPLOADED_FOLDER = 'uploaded';
+const GENERATED_FOLDER = 'generated';
+
+// Helper function to upload file to storage
+async function uploadFileToStorage(file: File | Blob, filePath: string): Promise<string> {
+  try {
+    // Create a FormData object
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('path', filePath);
+
+    // Upload to your storage API endpoint
+    const response = await fetch('/api/storage/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload file to storage');
+    }
+
+    const data = await response.json();
+    return data.url;
+  } catch (error) {
+    console.error('Error uploading file to storage:', error);
+    throw error;
+  }
+}
+
 /**
- * Upload an image to Supabase Storage
+ * Upload an image to storage
  * @param file The file to upload
  * @param userId The ID of the user
  * @returns The uploaded image information
@@ -13,40 +43,19 @@ export async function uploadImage(file: File, userId: string): Promise<Image> {
   try {
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `${userId}/${fileName}`;
+    const filePath = `${UPLOADED_FOLDER}/${userId}/${fileName}`;
 
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabaseClient.storage
-      .from(STORAGE_BUCKET)
-      .upload(`${UPLOADED_FOLDER}/${filePath}`, file);
-
-    if (uploadError) {
-      console.error('Error uploading file:', uploadError);
-      throw new Error(uploadError.message);
-    }
-
-    // Get public URL
-    const { data: urlData } = supabaseClient.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(`${UPLOADED_FOLDER}/${filePath}`);
+    // Upload file to storage
+    const publicUrl = await uploadFileToStorage(file, filePath);
 
     // Insert record in the database
-    const { data, error } = await supabaseClient
-      .from('images')
-      .insert({
-        user_id: userId,
-        type: 'uploaded',
-        url: urlData.publicUrl,
-      })
-      .select()
-      .single();
+    const result = await sql`
+      INSERT INTO images (user_id, type, url)
+      VALUES (${userId}, 'uploaded', ${publicUrl})
+      RETURNING *;
+    ` as unknown as Image[];
 
-    if (error) {
-      console.error('Error inserting image record:', error);
-      throw new Error(error.message);
-    }
-
-    return data as Image;
+    return result[0];
   } catch (error) {
     console.error('Error in uploadImage:', error);
     throw error;
@@ -54,53 +63,34 @@ export async function uploadImage(file: File, userId: string): Promise<Image> {
 }
 
 /**
- * Upload a generated image from a URL to Supabase Storage
+ * Upload a generated image from a URL to storage
  * @param imageUrl The URL of the generated image
  * @param userId The ID of the user
  * @returns The stored image information
  */
 export async function storeGeneratedImage(imageUrl: string, userId: string): Promise<Image> {
   try {
-    // Download the image
+    // Fetch the image from the URL
     const response = await fetch(imageUrl);
-    const blob = await response.blob();
-    
-    // Generate a unique file name
-    const fileName = `${uuidv4()}.png`;
-    const filePath = `${userId}/${fileName}`;
-
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from(STORAGE_BUCKET)
-      .upload(`${GENERATED_FOLDER}/${filePath}`, blob);
-
-    if (uploadError) {
-      console.error('Error uploading generated image:', uploadError);
-      throw new Error(uploadError.message);
+    if (!response.ok) {
+      throw new Error('Failed to fetch generated image');
     }
 
-    // Get public URL
-    const { data: urlData } = supabaseAdmin.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(`${GENERATED_FOLDER}/${filePath}`);
+    const imageBlob = await response.blob();
+    const fileName = `${uuidv4()}.png`;
+    const filePath = `${GENERATED_FOLDER}/${userId}/${fileName}`;
+
+    // Upload file to storage
+    const publicUrl = await uploadFileToStorage(imageBlob, filePath);
 
     // Insert record in the database
-    const { data, error } = await supabaseAdmin
-      .from('images')
-      .insert({
-        user_id: userId,
-        type: 'generated',
-        url: urlData.publicUrl,
-      })
-      .select()
-      .single();
+    const result = await sql`
+      INSERT INTO images (user_id, type, url)
+      VALUES (${userId}, 'generated', ${publicUrl})
+      RETURNING *;
+    ` as unknown as Image[];
 
-    if (error) {
-      console.error('Error inserting generated image record:', error);
-      throw new Error(error.message);
-    }
-
-    return data as Image;
+    return result[0];
   } catch (error) {
     console.error('Error in storeGeneratedImage:', error);
     throw error;
@@ -114,21 +104,13 @@ export async function storeGeneratedImage(imageUrl: string, userId: string): Pro
  */
 export async function createHeadshot(userId: string): Promise<Headshot> {
   try {
-    const { data, error } = await supabaseClient
-      .from('headshots')
-      .insert({
-        user_id: userId,
-        status: 'pending',
-      })
-      .select()
-      .single();
+    const result = await sql`
+      INSERT INTO headshots (user_id, status)
+      VALUES (${userId}, 'pending')
+      RETURNING *;
+    ` as unknown as Headshot[];
 
-    if (error) {
-      console.error('Error creating headshot record:', error);
-      throw new Error(error.message);
-    }
-
-    return data as Headshot;
+    return result[0];
   } catch (error) {
     console.error('Error in createHeadshot:', error);
     throw error;
@@ -150,22 +132,18 @@ export async function updateHeadshot(
   }
 ): Promise<Headshot> {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('headshots')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', headshotId)
-      .select()
-      .single();
+    const result = await sql`
+      UPDATE headshots
+      SET
+        status = COALESCE(${updates.status}, status),
+        prompt = COALESCE(${updates.prompt}, prompt),
+        generated_image_id = COALESCE(${updates.generated_image_id}, generated_image_id),
+        updated_at = NOW()
+      WHERE id = ${headshotId}
+      RETURNING *;
+    ` as unknown as Headshot[];
 
-    if (error) {
-      console.error('Error updating headshot record:', error);
-      throw new Error(error.message);
-    }
-
-    return data as Headshot;
+    return result[0];
   } catch (error) {
     console.error('Error in updateHeadshot:', error);
     throw error;
@@ -180,34 +158,26 @@ export async function updateHeadshot(
  */
 export async function getHeadshotWithImages(headshotId: string, userId: string): Promise<HeadshotWithImages> {
   try {
-    // Get the headshot
-    const { data: headshot, error: headshotError } = await supabaseClient
-      .from('headshots')
-      .select('*, generated_image:generated_image_id(*)')
-      .eq('id', headshotId)
-      .eq('user_id', userId)
-      .single();
-
-    if (headshotError) {
-      console.error('Error getting headshot:', headshotError);
-      throw new Error(headshotError.message);
-    }
+    // Get the headshot with its generated image
+    const headshot = await sql`
+      SELECT h.*, g.* as generated_image
+      FROM headshots h
+      LEFT JOIN images g ON h.generated_image_id = g.id
+      WHERE h.id = ${headshotId}
+      AND h.user_id = ${userId};
+    ` as unknown as HeadshotWithImages[];
 
     // Get uploaded images for the user
-    const { data: uploadedImages, error: imagesError } = await supabaseClient
-      .from('images')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('type', 'uploaded');
-
-    if (imagesError) {
-      console.error('Error getting uploaded images:', imagesError);
-      throw new Error(imagesError.message);
-    }
+    const uploadedImages = await sql`
+      SELECT *
+      FROM images
+      WHERE user_id = ${userId}
+      AND type = 'uploaded';
+    ` as unknown as Image[];
 
     return {
-      ...headshot,
-      uploaded_images: uploadedImages as Image[],
+      ...headshot[0],
+      uploaded_images: uploadedImages,
     } as HeadshotWithImages;
   } catch (error) {
     console.error('Error in getHeadshotWithImages:', error);
@@ -222,18 +192,15 @@ export async function getHeadshotWithImages(headshotId: string, userId: string):
  */
 export async function getUserHeadshots(userId: string): Promise<HeadshotWithImages[]> {
   try {
-    const { data, error } = await supabaseClient
-      .from('headshots')
-      .select('*, generated_image:generated_image_id(*)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const result = await sql`
+      SELECT h.*, g.* as generated_image
+      FROM headshots h
+      LEFT JOIN images g ON h.generated_image_id = g.id
+      WHERE h.user_id = ${userId}
+      ORDER BY h.created_at DESC;
+    ` as unknown as HeadshotWithImages[];
 
-    if (error) {
-      console.error('Error getting user headshots:', error);
-      throw new Error(error.message);
-    }
-
-    return data as HeadshotWithImages[];
+    return result;
   } catch (error) {
     console.error('Error in getUserHeadshots:', error);
     throw error;
@@ -247,19 +214,15 @@ export async function getUserHeadshots(userId: string): Promise<HeadshotWithImag
  */
 export async function getUserUploadedImages(userId: string): Promise<Image[]> {
   try {
-    const { data, error } = await supabaseClient
-      .from('images')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('type', 'uploaded')
-      .order('created_at', { ascending: false });
+    const result = await sql`
+      SELECT *
+      FROM images
+      WHERE user_id = ${userId}
+      AND type = 'uploaded'
+      ORDER BY created_at DESC;
+    ` as unknown as Image[];
 
-    if (error) {
-      console.error('Error getting user uploaded images:', error);
-      throw new Error(error.message);
-    }
-
-    return data as Image[];
+    return result;
   } catch (error) {
     console.error('Error in getUserUploadedImages:', error);
     throw error;
@@ -268,55 +231,32 @@ export async function getUserUploadedImages(userId: string): Promise<Image[]> {
 
 /**
  * Delete an image
- * @param imageId The ID of the image
- * @param userId The ID of the user (for verification)
+ * @param imageId The ID of the image to delete
+ * @param userId The ID of the user
  * @returns Success status
  */
 export async function deleteImage(imageId: string, userId: string): Promise<boolean> {
   try {
-    // Get the image to check ownership and get the URL
-    const { data: image, error: getError } = await supabaseClient
-      .from('images')
-      .select('*')
-      .eq('id', imageId)
-      .eq('user_id', userId)
-      .single();
+    // Get the image first to get its URL
+    const image = await sql`
+      SELECT *
+      FROM images
+      WHERE id = ${imageId}
+      AND user_id = ${userId};
+    ` as unknown as Image[];
 
-    if (getError) {
-      console.error('Error getting image for deletion:', getError);
-      throw new Error(getError.message);
+    if (!image[0]) {
+      throw new Error('Image not found');
     }
 
-    if (!image) {
-      throw new Error('Image not found or not owned by user');
-    }
-
-    // Extract the path from the URL
-    const url = new URL(image.url);
-    const pathParts = url.pathname.split('/');
-    const storagePath = pathParts.slice(pathParts.indexOf(STORAGE_BUCKET) + 1).join('/');
-
-    // Delete from storage
-    const { error: storageError } = await supabaseClient.storage
-      .from(STORAGE_BUCKET)
-      .remove([storagePath]);
-
-    if (storageError) {
-      console.error('Error deleting image from storage:', storageError);
-      // Continue with database deletion even if storage deletion fails
-    }
+    // TODO: Implement file deletion from your preferred storage solution
 
     // Delete from database
-    const { error: dbError } = await supabaseClient
-      .from('images')
-      .delete()
-      .eq('id', imageId)
-      .eq('user_id', userId);
-
-    if (dbError) {
-      console.error('Error deleting image from database:', dbError);
-      throw new Error(dbError.message);
-    }
+    await sql`
+      DELETE FROM images
+      WHERE id = ${imageId}
+      AND user_id = ${userId};
+    `;
 
     return true;
   } catch (error) {

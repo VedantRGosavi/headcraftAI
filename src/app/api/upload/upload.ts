@@ -1,22 +1,15 @@
 // pages/api/upload/upload.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
-import { supabaseAdmin } from '../../../lib/supabase';
 import { uploadImage } from '../../../lib/images';
 import fs from 'fs';
+import { stackServerApp } from '@/stack';
 
 // Disable the default body parser
 export const config = {
   api: {
     bodyParser: false,
   },
-};
-
-type FormidableFile = {
-  filepath: string;
-  originalFilename: string;
-  mimetype: string;
-  size: number;
 };
 
 export default async function handler(
@@ -29,13 +22,13 @@ export default async function handler(
   }
 
   // Check auth
-  const { data: session, error: authError } = await supabaseAdmin.auth.getSession();
+  const user = await stackServerApp.getUser();
 
-  if (authError || !session) {
+  if (!user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const userId = session.session?.user.id;
+  const userId = user.id;
 
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });

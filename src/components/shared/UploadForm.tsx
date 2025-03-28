@@ -1,10 +1,11 @@
 // components/shared/UploadForm.tsx
 import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { useDropzone } from 'react-dropzone';
 import { FiUpload, FiX, FiCheck } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
+import { useUser } from '@stackframe/stack';
 import { uploadImage } from '../../lib/images';
-import { getCurrentUser } from '../../lib/supabase';
 import { UploadedImage } from '../../types/image';
 
 interface UploadFormProps {
@@ -20,6 +21,7 @@ const UploadForm: React.FC<UploadFormProps> = ({
   buttonText = 'Upload Images',
   disabled = false,
 }) => {
+  const currentUser = useUser();
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,14 +77,13 @@ const UploadForm: React.FC<UploadFormProps> = ({
     });
   };
 
-  // Upload all images to Supabase
+  // Upload all images
   const handleUpload = async () => {
     try {
       setUploading(true);
       setError(null);
 
-      const user = await getCurrentUser();
-      if (!user) {
+      if (!currentUser) {
         throw new Error('You must be logged in to upload images');
       }
 
@@ -90,7 +91,7 @@ const UploadForm: React.FC<UploadFormProps> = ({
         .filter(image => !image.uploaded)
         .map(async (image) => {
           try {
-            const uploadedImage = await uploadImage(image.file, user.id);
+            const uploadedImage = await uploadImage(image.file, currentUser.id);
             return uploadedImage.id;
           } catch (error) {
             console.error('Error uploading image:', error);
@@ -141,10 +142,16 @@ const UploadForm: React.FC<UploadFormProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2">
             {images.map((image, index) => (
               <div key={index} className="relative rounded-lg overflow-hidden border border-gray-200">
-                <img
+                <Image
                   src={image.preview}
                   alt={`Upload preview ${index + 1}`}
+                  width={300}
+                  height={160}
                   className="w-full h-40 object-cover"
+                  style={{
+                    maxWidth: '100%',
+                    height: '160px',
+                  }}
                 />
                 <button
                   onClick={() => removeImage(index)}

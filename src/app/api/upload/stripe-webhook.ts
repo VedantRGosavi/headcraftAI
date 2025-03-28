@@ -43,7 +43,7 @@ export default async function handler(
       const session = event.data.object as Stripe.Checkout.Session;
       
       // Verify the payment and get user/headshot IDs
-      const { userId, headshotId, paid } = await verifyPayment(session.id);
+      const { headshotId, paid } = await verifyPayment(session.id);
 
       if (paid) {
         // Start the headshot generation process

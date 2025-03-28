@@ -1,4 +1,3 @@
-
 ---
 
 ### PRODUCT.md
@@ -18,17 +17,17 @@ headcraftAI aims to provide an accessible platform for individuals to generate p
 
 ## Key Features
 
-- User authentication and account management.
-- Upload functionality for multiple images.
-- Optional chat interface to refine headshot preferences.
-- AI-powered headshot generation using OpenAI's GPT-4 and DALL-E.
-- Secure storage and retrieval of images via Supabase.
-- Payment processing for headshot generation via Stripe.
-- Downloadable headshot images.
+- User authentication and account management via Stack Auth
+- Upload functionality for multiple images
+- Optional chat interface to refine headshot preferences
+- AI-powered headshot generation using OpenAI's GPT-4 and DALL-E
+- Secure storage and retrieval of images
+- Payment processing for headshot generation via Stripe
+- Downloadable headshot images
 
 ## User Stories
 
-1. As a user, I want to create an account and log in securely.
+1. As a user, I want to create an account and log in securely using Stack Auth.
 2. As a user, I want to upload multiple images of myself to the app.
 3. As a user, I want to optionally specify preferences for my headshot through a chat interface.
 4. As a user, I want to initiate the headshot generation process.
@@ -44,29 +43,30 @@ headcraftAI aims to provide an accessible platform for individuals to generate p
 
 ## Technical Requirements
 
-- Built with **Next.js** and **TypeScript**.
-- Uses **Supabase** for database, storage, and authentication.
-- Integrates **OpenAI API** (GPT-4 for analysis, DALL-E for generation).
-- Implements **Stripe** for payment processing.
-- Deployed on **Vercel**.
+- Built with **Next.js** and **TypeScript**
+- Uses **Neon** for PostgreSQL database
+- Uses **Stack Auth** for authentication and user management
+- Integrates **OpenAI API** (GPT-4 for analysis, DALL-E for generation)
+- Implements **Stripe** for payment processing
+- Deployed on **Vercel**
 
 ## AI Workflow
 
-1. **Image Upload**: User uploads multiple images to `user-images/uploaded/`.
-2. **Optional Chat Interaction**: User chats with ChatGPT to specify preferences (e.g., background color, attire).
+1. **Image Upload**: User uploads multiple images to the server
+2. **Optional Chat Interaction**: User chats with ChatGPT to specify preferences (e.g., background color, attire)
 3. **Prompt Generation**:
-   - GPT-4 analyzes uploaded images to create a base description (e.g., "A person with short black hair").
-   - Chat history (if any) refines the description (e.g., "A professional headshot with a blue background").
-4. **Image Generation**: The final prompt is sent to DALL-E to generate the headshot.
-5. **Storage**: The generated image is saved to `user-images/generated/` and linked to the user’s account.
+   - GPT-4 analyzes uploaded images to create a base description (e.g., "A person with short black hair")
+   - Chat history (if any) refines the description (e.g., "A professional headshot with a blue background")
+4. **Image Generation**: The final prompt is sent to DALL-E to generate the headshot
+5. **Storage**: The generated image is saved and linked to the user's account
 
 ## Roadmap
 
-1. **Set up project structure and dependencies.**
-2. **Implement user authentication with Supabase Auth.**
-3. **Create image upload functionality using Supabase Storage.**
-4. **Integrate OpenAI API for headshot generation.**
-5. **Set up Stripe for payment processing.**
-6. **Develop frontend UI components.**
-7. **Test the end-to-end workflow.**
-8. **Deploy to Vercel.**
+1. **Set up project structure and dependencies**
+2. **Implement user authentication with Stack Auth**
+3. **Create image upload functionality**
+4. **Integrate OpenAI API for headshot generation**
+5. **Set up Stripe for payment processing**
+6. **Develop frontend UI components**
+7. **Test the end-to-end workflow**
+8. **Deploy to Vercel**

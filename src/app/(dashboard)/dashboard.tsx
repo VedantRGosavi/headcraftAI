@@ -1,23 +1,22 @@
 // src/app/(dashboard)/dashboard.tsx
 import type { NextPage } from 'next';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { FiPlus, FiLoader, FiImage } from 'react-icons/fi';
 import { Toaster, toast } from 'react-hot-toast';
+import { useUser } from '@stackframe/stack';
 import Layout from '../../components/layout';
 import UploadForm from '../../components/shared/UploadForm';
 import ChatInterface from '../../components/shared/ChatInterface';
 import HeadshotDisplay from '../../components/shared/HeadshotDisplay';
-import { User } from '../../types/user';
 import { HeadshotWithImages, GenerationPreference } from '../../types/image';
-import { supabaseClient } from '../../lib/supabase';
 import { getUserHeadshots, getHeadshotWithImages } from '../../lib/images';
 import { createHeadshot } from '../../lib/images';
 
 const Dashboard: NextPage = () => {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const currentUser = useUser();
   const [loading, setLoading] = useState(true);
   const [headshots, setHeadshots] = useState<HeadshotWithImages[]>([]);
   const [currentHeadshot, setCurrentHeadshot] = useState<HeadshotWithImages | null>(null);
@@ -28,68 +27,18 @@ const Dashboard: NextPage = () => {
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [showChatInterface, setShowChatInterface] = useState(false);
 
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!currentUser) {
+      router.push('/login');
+    }
+  }, [currentUser, router]);
+
   // Check for success or error params from the URL query
   const { success, canceled, headshot: headshotId } = router.query;
 
-  useEffect(() => {
-    // Handle success or canceled payments
-    if (success === 'true' && headshotId) {
-      toast.success('Payment successful! Your headshot is being generated.');
-      // Refresh the headshot data
-      if (user) {
-        fetchHeadshotDetails(headshotId as string, user.id);
-      }
-    } else if (canceled === 'true') {
-      toast.error('Payment was canceled. Your headshot will not be generated.');
-    }
-  }, [success, canceled, headshotId, user]);
-
-  useEffect(() => {
-    // Check if user is authenticated
-    const checkUser = async () => {
-      try {
-        const { data: { session }, error } = await supabaseClient.auth.getSession();
-        
-        if (error || !session) {
-          router.push('/login');
-          return;
-        }
-        
-        setUser(session.user);
-        
-        // Fetch user's headshots
-        if (session.user) {
-          await fetchHeadshots(session.user.id);
-        }
-      } catch (error) {
-        console.error('Error checking auth status:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkUser();
-
-    // Listen for auth state changes
-    const { data: authListener } = supabaseClient.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-          setUser(session.user);
-          await fetchHeadshots(session.user.id);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          router.push('/login');
-        }
-      }
-    );
-
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
-  }, [router]);
-
   // Fetch user's headshots
-  const fetchHeadshots = async (userId: string) => {
+  const fetchHeadshots = useCallback(async (userId: string) => {
     try {
       const userHeadshots = await getUserHeadshots(userId);
       setHeadshots(userHeadshots);
@@ -102,10 +51,10 @@ const Dashboard: NextPage = () => {
       console.error('Error fetching headshots:', error);
       toast.error('Failed to load your headshots');
     }
-  };
+  }, []);
 
   // Fetch details for a specific headshot
-  const fetchHeadshotDetails = async (id: string, userId: string) => {
+  const fetchHeadshotDetails = useCallback(async (id: string, userId: string) => {
     try {
       const headshot = await getHeadshotWithImages(id, userId);
       setCurrentHeadshot(headshot);
@@ -116,18 +65,49 @@ const Dashboard: NextPage = () => {
       console.error('Error fetching headshot details:', error);
       toast.error('Failed to load headshot details');
     }
-  };
+  }, [fetchHeadshots]);
+
+  useEffect(() => {
+    // Handle success or canceled payments
+    if (success === 'true' && headshotId) {
+      toast.success('Payment successful! Your headshot is being generated.');
+      // Refresh the headshot data
+      if (currentUser) {
+        fetchHeadshotDetails(headshotId as string, currentUser.id);
+      }
+    } else if (canceled === 'true') {
+      toast.error('Payment was canceled. Your headshot will not be generated.');
+    }
+  }, [success, canceled, headshotId, currentUser, fetchHeadshotDetails]);
+
+  useEffect(() => {
+    // Fetch user's headshots when user is available
+    const loadHeadshots = async () => {
+      if (currentUser) {
+        try {
+          await fetchHeadshots(currentUser.id);
+        } catch (error) {
+          console.error('Error fetching headshots:', error);
+          toast.error('Failed to load your headshots');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadHeadshots();
+  }, [currentUser, fetchHeadshots]);
 
   // Handle creating a new headshot
-  const handleNewHeadshot = async () => {
-    if (!user) {
+  const handleNewHeadshot = useCallback(async () => {
+    if (!currentUser) {
       toast.error('You must be logged in to create a headshot');
       return;
     }
 
     try {
       // Create a new headshot record
-      const newHeadshot = await createHeadshot(user.id);
+      const newHeadshot = await createHeadshot(currentUser.id);
       
       // Set it as the current headshot
       setCurrentHeadshot(newHeadshot);
@@ -142,31 +122,31 @@ const Dashboard: NextPage = () => {
       setShowChatInterface(false);
       
       // Refresh the list of headshots
-      await fetchHeadshots(user.id);
+      await fetchHeadshots(currentUser.id);
     } catch (error) {
       console.error('Error creating new headshot:', error);
       toast.error('Failed to create new headshot');
     }
-  };
+  }, [currentUser, fetchHeadshots]);
 
   // Handle uploaded images
-  const handleImagesUploaded = (imageIds: string[]) => {
+  const handleImagesUploaded = useCallback((imageIds: string[]) => {
     setUploadedImageIds(prev => [...prev, ...imageIds]);
     toast.success(`${imageIds.length} images uploaded successfully`);
     
     // After uploading, show the chat interface
     setShowUploadForm(false);
     setShowChatInterface(true);
-  };
+  }, []);
 
   // Handle preferences from the chat
-  const handlePreferencesUpdated = (newPreferences: GenerationPreference) => {
+  const handlePreferencesUpdated = useCallback((newPreferences: GenerationPreference) => {
     setPreferences(newPreferences);
-  };
+  }, []);
 
   // Generate headshot
-  const handleGenerateHeadshot = async () => {
-    if (!user || !currentHeadshot || uploadedImageIds.length === 0) {
+  const handleGenerateHeadshot = useCallback(async () => {
+    if (!currentUser || !currentHeadshot || uploadedImageIds.length === 0) {
       toast.error('Please upload at least one image before generating a headshot');
       return;
     }
@@ -198,7 +178,7 @@ const Dashboard: NextPage = () => {
         window.location.href = data.checkoutUrl;
       } else {
         // Otherwise, update the current headshot
-        await fetchHeadshotDetails(currentHeadshot.id, user.id);
+        await fetchHeadshotDetails(currentHeadshot.id, currentUser.id);
         toast.success('Headshot generation initiated');
       }
     } catch (error) {
@@ -208,17 +188,17 @@ const Dashboard: NextPage = () => {
     } finally {
       setGeneratingHeadshot(false);
     }
-  };
+  }, [currentUser, currentHeadshot, uploadedImageIds, preferences, fetchHeadshotDetails]);
 
   // Handle selecting a different headshot
-  const handleSelectHeadshot = (headshot: HeadshotWithImages) => {
+  const handleSelectHeadshot = useCallback((headshot: HeadshotWithImages) => {
     setCurrentHeadshot(headshot);
     setShowUploadForm(false);
     setShowChatInterface(false);
-  };
+  }, []);
 
   return (
-    <Layout user={user} loading={loading} title="Dashboard - headcraftAI">
+    <Layout user={currentUser} loading={loading} title="Dashboard - headcraftAI">
       <Toaster position="top-right" />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

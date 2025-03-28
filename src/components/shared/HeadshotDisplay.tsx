@@ -1,5 +1,6 @@
 // components/shared/HeadshotDisplay.tsx
 import React from 'react';
+import Image from 'next/image';
 import { FiDownload, FiLoader, FiAlertTriangle } from 'react-icons/fi';
 import { HeadshotWithImages } from '../../types/image';
 
@@ -105,10 +106,16 @@ const HeadshotDisplay: React.FC<HeadshotDisplayProps> = ({
             </p>
           </div>
         ) : headshot.generated_image ? (
-          <img
+          <Image
             src={headshot.generated_image.url}
             alt="Generated headshot"
             className="max-w-full max-h-full object-contain"
+            width={500}
+            height={500}
+            style={{
+              maxWidth: '100%',
+              height: 'auto',
+            }}
           />
         ) : (
           <div className="text-center">

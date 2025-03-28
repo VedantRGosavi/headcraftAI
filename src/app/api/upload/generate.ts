@@ -1,41 +1,34 @@
 // pages/api/upload/generate.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabaseAdmin } from '../../../lib/supabase';
+import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '../../../lib/neondb';
 import { analyzeImages, generateHeadshotPrompt, generateHeadshot } from '../../../lib/openai';
 import { createHeadshot, storeGeneratedImage, updateHeadshot, getUserUploadedImages } from '../../../lib/images';
 import { createCheckoutSession } from '../../../lib/stripe';
 import { GenerationPreference } from '../../../types/image';
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // Only accept POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  // Check auth
-  const { data: session, error: authError } = await supabaseAdmin.auth.getSession();
-
-  if (authError || !session) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const userId = session.session?.user.id;
-
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
+export async function POST(req: Request) {
   try {
-    const { imageIds, preferences = {} } = req.body as {
+    // Check auth
+    const { data: session, error: authError } = await supabaseAdmin.auth.getSession();
+
+    if (authError || !session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = session.session?.user.id;
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { imageIds, preferences = {} } = body as {
       imageIds: string[];
       preferences?: GenerationPreference;
     };
 
     if (!imageIds || !Array.isArray(imageIds) || imageIds.length === 0) {
-      return res.status(400).json({ error: 'No image IDs provided' });
+      return NextResponse.json({ error: 'No image IDs provided' }, { status: 400 });
     }
 
     // Create a headshot record
@@ -46,7 +39,7 @@ export default async function handler(
     const selectedImages = uploadedImages.filter(img => imageIds.includes(img.id));
 
     if (selectedImages.length === 0) {
-      return res.status(400).json({ error: 'No valid images found' });
+      return NextResponse.json({ error: 'No valid images found' }, { status: 400 });
     }
 
     const imageUrls = selectedImages.map(img => img.url);
@@ -62,14 +55,14 @@ export default async function handler(
     // Create a Stripe checkout session for payment
     const checkoutUrl = await createCheckoutSession(userId, headshot.id);
 
-    return res.status(200).json({
+    return NextResponse.json({
       headshot,
       checkoutUrl,
       message: 'Headshot generation initiated',
     });
   } catch (error) {
     console.error('Error in generate API:', error);
-    return res.status(500).json({ error: 'Failed to generate headshot' });
+    return NextResponse.json({ error: 'Failed to generate headshot' }, { status: 500 });
   }
 }
 

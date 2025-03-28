@@ -1,0 +1,16 @@
+{
+  "name": "headcraftai",
+  "short_name": "headcraftai",
+  "description": "Your AI-powered visual content creation studio",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#33B9F2",
+  "theme_color": "#33B9F2",
+  "icons": [
+    {
+      "src": "/favicon/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+} 

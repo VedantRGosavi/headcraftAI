@@ -1,4 +1,5 @@
-// src/app/(auth)/login/login.tsx
+'use client';
+
 import type { NextPage } from 'next';
 import Link from 'next/link';
 import { SignIn } from '@stackframe/stack';
@@ -32,4 +33,4 @@ const Login: NextPage = () => {
   );
 };
 
-export default Login;
+export default Login; 

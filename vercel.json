@@ -2,8 +2,8 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "rewrites": [
-    { "source": "/auth/sign-up", "destination": "/(auth)/signup" },
-    { "source": "/auth/login", "destination": "/(auth)/login" }
+    { "source": "/signup", "destination": "/auth/signup" },
+    { "source": "/login", "destination": "/auth/login" }
   ],
   "headers": [
     {
@@ -24,7 +24,7 @@
       ]
     },
     {
-      "source": "/(.*)\\.(?:jpg|jpeg|gif|png|webp)",
+      "source": "/(.*)\\.(jpg|jpeg|gif|png|webp)",
       "headers": [
         {
           "key": "Cache-Control",

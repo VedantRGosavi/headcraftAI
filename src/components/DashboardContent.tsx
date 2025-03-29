@@ -1,15 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Image as ImageType } from '../types/image';
-import { getUserUploadedImages, getUserHeadshots } from '../lib/images';
+import { getUserUploadedImages, getUserHeadshots, uploadImage, createHeadshot } from '../lib/images';
+import { stackClient } from '../lib/stack-client';
+
+interface User {
+  id?: string;
+  email?: string;
+  name?: string;
+}
 
 export default function DashboardContent() {
   const [uploadedImages, setUploadedImages] = useState<ImageType[]>([]);
   const [headshots, setHeadshots] = useState<ImageType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -70,6 +81,81 @@ export default function DashboardContent() {
     };
   }, []); // No dependencies needed with this approach
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    try {
+      setUploading(true);
+      
+      const user = await stackClient.getUser() as unknown as User;
+      const userId = user?.id || 'guest';
+      
+      const file = files[0];
+      const uploadedImage = await uploadImage({
+        file,
+        userId
+      });
+      
+      // Add the new image to state
+      setUploadedImages(prev => [uploadedImage, ...prev]);
+      
+      // Select the uploaded image for headshot generation
+      setSelectedImage(uploadedImage.id);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setError('Failed to upload image. Please try again.');
+    } finally {
+      setUploading(false);
+      
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+  
+  const handleGenerateHeadshots = async () => {
+    if (!selectedImage) {
+      setError('Please select an image first.');
+      return;
+    }
+    
+    try {
+      setGenerating(true);
+      
+      // Find the selected image
+      const image = uploadedImages.find(img => img.id === selectedImage);
+      if (!image) {
+        throw new Error('Selected image not found');
+      }
+      
+      // Create a new headshot generation process
+      const headshot = await createHeadshot();
+      
+      // In a real app, you would start a job to generate headshots here
+      // For now, we'll simulate it by adding a placeholder
+      const placeholderHeadshot: ImageType = {
+        id: headshot.id || 'temp-' + Date.now(),
+        url: image.url, // Use original image as placeholder
+        type: 'headshot',
+        user_id: image.user_id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        status: 'processing'
+      };
+      
+      // Add the placeholder to state
+      setHeadshots(prev => [placeholderHeadshot, ...prev]);
+      
+    } catch (error) {
+      console.error('Error generating headshots:', error);
+      setError('Failed to generate headshots. Please try again.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -102,6 +188,63 @@ export default function DashboardContent() {
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">Your Dashboard</h1>
 
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-4 mb-8">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center"
+        >
+          {uploading ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Uploading...
+            </>
+          ) : (
+            <>
+              <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Upload Image
+            </>
+          )}
+        </button>
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          accept="image/*"
+          className="hidden"
+        />
+
+        <button
+          onClick={handleGenerateHeadshots}
+          disabled={generating || !selectedImage}
+          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center"
+        >
+          {generating ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Generating...
+            </>
+          ) : (
+            <>
+              <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              Generate Headshots
+            </>
+          )}
+        </button>
+      </div>
+
       <div className="space-y-8">
         {/* Uploaded Images Section */}
         <section>
@@ -113,7 +256,11 @@ export default function DashboardContent() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {uploadedImages.map((image) => (
-                <div key={image.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div 
+                  key={image.id} 
+                  className={`bg-white rounded-lg shadow-md overflow-hidden cursor-pointer ${selectedImage === image.id ? 'ring-2 ring-indigo-500' : ''}`}
+                  onClick={() => setSelectedImage(image.id)}
+                >
                   <div className="relative w-full h-48">
                     <Image
                       src={image.url}

@@ -2,31 +2,36 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Toaster } from 'sonner';
 import { stackClient } from '../lib/stack-client';
+import Header from './shared/Header';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
+  const isAuthPage = pathname?.includes('/login') || pathname?.includes('/signup');
 
   useEffect(() => {
     async function checkAuth() {
       try {
         const currentUser = await stackClient.getUser();
-        if (!currentUser) {
+        if (!currentUser && !isAuthPage) {
           router.push('/');
         }
       } catch (error) {
         console.error('Error checking auth:', error);
-        router.push('/');
+        if (!isAuthPage) {
+          router.push('/');
+        }
       } finally {
         setLoading(false);
       }
     }
 
     checkAuth();
-  }, [router]);
+  }, [router, isAuthPage]);
 
   if (loading) {
     return (
@@ -40,8 +45,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {!isAuthPage && <Header />}
       <Toaster position="top-right" />
-      {children}
+      <main className="py-4">
+        {children}
+      </main>
     </div>
   );
 }

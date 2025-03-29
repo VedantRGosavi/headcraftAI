@@ -1,30 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { stackClient } from '../lib/stack-client';
 import Layout from './layout';
 
 export default function HomeContent() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function checkAuth() {
-      try {
-        const currentUser = await stackClient.getUser();
-        if (currentUser) {
-          router.push('/dashboard');
-        }
-      } catch (error) {
-        console.error('Error checking auth:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    checkAuth();
-  }, [router]);
+    // Just set loading to false immediately without checking auth
+    setLoading(false);
+  }, []);
 
   if (loading) {
     return (

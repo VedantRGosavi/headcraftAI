@@ -12,14 +12,19 @@ export default function DashboardContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+    
     async function loadUserData() {
       try {
         setLoading(true);
         setError(null);
+        
+        // Store the loading state in a local variable to avoid dependency issues
+        const currentlyLoading = true;
 
         // Add timeout to prevent infinite loading state
         const timeout = setTimeout(() => {
-          if (loading) {
+          if (isMounted && currentlyLoading) {
             setLoading(false);
             setError('Request timed out. Please refresh and try again.');
           }
@@ -43,18 +48,27 @@ export default function DashboardContent() {
 
         clearTimeout(timeout);
         
-        setUploadedImages(images || []);
-        setHeadshots(userHeadshots || []);
+        if (isMounted) {
+          setUploadedImages(images || []);
+          setHeadshots(userHeadshots || []);
+          setLoading(false);
+        }
       } catch (error) {
         console.error('Error loading user data:', error);
-        setError('Failed to load your data. Please refresh the page.');
-      } finally {
-        setLoading(false);
+        if (isMounted) {
+          setError('Failed to load your data. Please refresh the page.');
+          setLoading(false);
+        }
       }
     }
 
     loadUserData();
-  }, []);
+    
+    // Cleanup function to handle component unmounting
+    return () => {
+      isMounted = false;
+    };
+  }, []); // No dependencies needed with this approach
 
   if (loading) {
     return (
@@ -71,7 +85,11 @@ export default function DashboardContent() {
       <div className="flex flex-col items-center justify-center min-h-screen">
         <div className="text-red-600 mb-4">{error}</div>
         <button 
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.location.reload();
+            }
+          }}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
         >
           Refresh Page

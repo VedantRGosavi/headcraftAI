@@ -1,4 +1,6 @@
 // components/shared/HeadshotDisplay.tsx
+'use client';
+
 import React from 'react';
 import Image from 'next/image';
 import { FiDownload, FiLoader, FiAlertTriangle } from 'react-icons/fi';
@@ -22,18 +24,22 @@ const HeadshotDisplay: React.FC<HeadshotDisplayProps> = ({
     try {
       const response = await fetch(headshot.generated_image.url);
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
       
-      // Create a link element and trigger download
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `headshot-${headshot.id}.png`;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Clean up
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      // Use browser APIs safely
+      if (typeof window !== 'undefined' && document) {
+        const url = window.URL.createObjectURL(blob);
+        
+        // Create a link element and trigger download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `headshot-${headshot.id}.png`;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Clean up
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
     } catch (err) {
       console.error('Error downloading image:', err);
       alert('Failed to download image. Please try again.');

@@ -1,18 +1,18 @@
 import { neon } from '@neondatabase/serverless';
 
-if (!process.env.NEON_DATABASE_URL) {
-  throw new Error('NEON_DATABASE_URL environment variable is not set');
-}
+// Check for NEON_DATABASE_URL, but don't throw an error during build time
+const neonDatabaseUrl = process.env.NEON_DATABASE_URL || '';
 
-// Initialize the neon client with the database URL
-const sql = neon(process.env.NEON_DATABASE_URL);
-
-// Define the type for our neon query function
-type SqlQueryFunction = typeof sql;
+// Initialize the neon client conditionally
+const sql = neonDatabaseUrl ? neon(neonDatabaseUrl) : null;
 
 export const db = {
   query: async (text: string, params?: unknown[]) => {
     try {
+      if (!sql) {
+        console.error('Database connection not initialized - missing NEON_DATABASE_URL');
+        return { rows: [], rowCount: 0 };
+      }
       const result = await sql(text, params);
       return { rows: result, rowCount: result.length };
     } catch (error) {
@@ -21,15 +21,21 @@ export const db = {
     }
   },
   
-  // Add a transaction helper
-  transaction: async <T>(callback: (client: SqlQueryFunction) => Promise<T>): Promise<T> => {
+  // Simplified transaction helper that doesn't rely on passing sql to callback
+  transaction: async <T>(callback: () => Promise<T>): Promise<T> => {
     try {
+      if (!sql) {
+        console.error('Database connection not initialized - missing NEON_DATABASE_URL');
+        throw new Error('Database connection not initialized');
+      }
       await sql('BEGIN');
-      const result = await callback(sql);
+      const result = await callback();
       await sql('COMMIT');
       return result;
     } catch (error) {
-      await sql('ROLLBACK');
+      if (sql) {
+        await sql('ROLLBACK');
+      }
       throw error;
     }
   }

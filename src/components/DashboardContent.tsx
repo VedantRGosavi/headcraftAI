@@ -81,6 +81,35 @@ export default function DashboardContent() {
     };
   }, []); // No dependencies needed with this approach
 
+  // Helper function to get a user ID - either from Stack auth or fallback to a default
+  const getUserId = async (): Promise<string> => {
+    try {
+      // Try to get from Stack auth first
+      const user = await stackClient.getUser() as unknown as User;
+      if (user?.id) {
+        return user.id;
+      }
+      
+      // If not available from Stack auth, check localStorage
+      if (typeof window !== 'undefined') {
+        const localUserId = localStorage.getItem('userId');
+        if (localUserId) {
+          return localUserId;
+        }
+        
+        // Generate a new ID if none exists
+        const newUserId = 'guest-' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('userId', newUserId);
+        return newUserId;
+      }
+    } catch (error) {
+      console.error('Error getting user ID:', error);
+    }
+    
+    // Final fallback - generate a random guest ID
+    return 'guest-' + Math.random().toString(36).substring(2, 15);
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -88,8 +117,8 @@ export default function DashboardContent() {
     try {
       setUploading(true);
       
-      const user = await stackClient.getUser() as unknown as User;
-      const userId = user?.id || 'guest';
+      // Get user ID with fallback methods
+      const userId = await getUserId();
       
       const file = files[0];
       const uploadedImage = await uploadImage({

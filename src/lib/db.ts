@@ -1,16 +1,39 @@
 import { neon } from '@neondatabase/serverless';
 
-// Check for NEON_DATABASE_URL, but don't throw an error during build time
-const neonDatabaseUrl = process.env.NEON_DATABASE_URL || '';
+// Check for database URLs in order of preference
+const getDatabaseUrl = () => {
+  // First check for NEON_DATABASE_URL
+  if (process.env.NEON_DATABASE_URL) {
+    return process.env.NEON_DATABASE_URL;
+  }
+  
+  // Fallback to DATABASE_URL if NEON_DATABASE_URL is not available
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+  
+  // Log a warning in development, but don't throw an error
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn('No database URL found. Using mock data.');
+  }
+  
+  return '';
+};
 
 // Initialize the neon client conditionally
+const neonDatabaseUrl = getDatabaseUrl();
 const sql = neonDatabaseUrl ? neon(neonDatabaseUrl) : null;
+
+// For debugging in development only
+if (process.env.NODE_ENV !== 'production' && !sql) {
+  console.warn('Database connection not initialized - using mock data');
+}
 
 export const db = {
   query: async (text: string, params?: unknown[]) => {
     try {
       if (!sql) {
-        console.error('Database connection not initialized - missing NEON_DATABASE_URL');
+        console.error('Database connection not initialized - missing database URL');
         return { rows: [], rowCount: 0 };
       }
       const result = await sql(text, params);
@@ -25,7 +48,7 @@ export const db = {
   transaction: async <T>(callback: () => Promise<T>): Promise<T> => {
     try {
       if (!sql) {
-        console.error('Database connection not initialized - missing NEON_DATABASE_URL');
+        console.error('Database connection not initialized - missing database URL');
         throw new Error('Database connection not initialized');
       }
       await sql('BEGIN');

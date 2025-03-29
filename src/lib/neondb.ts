@@ -1,26 +1,22 @@
 import { neon } from '@neondatabase/serverless';
 import { db } from './db';
+import { stackServerApp } from '../app/api/_stack';
 
-// Check if we're in a build environment or missing database URL
-const isBuildTime = process.env.NODE_ENV === 'production' && typeof window === 'undefined' && !process.env.VERCEL_ENV;
-const mockDatabase = isBuildTime || !process.env.NEON_DATABASE_URL;
+if (!process.env.NEON_DATABASE_URL) {
+  throw new Error('NEON_DATABASE_URL environment variable is not set');
+}
 
 // Initialize Neon client
-export const neonClient = mockDatabase 
-  ? ((text: string, params?: unknown[]) => { console.log(`Mock neonClient query: ${text}`, params); return []; }) 
-  : neon(process.env.NEON_DATABASE_URL!);
+export const neonClient = neon(process.env.NEON_DATABASE_URL);
 
-// Auth helper functions to replace Supabase auth
+// Auth helper functions
 export const auth = {
   getSession: async () => {
-    // This would typically come from a session cookie or token
-    // For now, return a placeholder that will be replaced with actual auth
+    const user = await stackServerApp.getUser();
     return {
       data: { 
         session: {
-          user: { 
-            id: '' 
-          }
+          user: user || null
         } 
       },
       error: null
@@ -28,10 +24,9 @@ export const auth = {
   }
 };
 
-// Create admin interface that's similar to what was expected from Supabase
+// Create admin interface
 export const supabaseAdmin = {
   auth: auth,
-  // Add any other required methods
   from: (table: string) => ({
     select: (columns: string) => ({
       eq: (column: string, value: string | number) => {

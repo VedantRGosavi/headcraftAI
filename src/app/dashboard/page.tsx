@@ -1,7 +1,6 @@
 'use client';
 
 import { Suspense } from 'react';
-import { useUser } from '@stackframe/stack';
 import Layout from '../../components/layout';
 import DashboardContent from '../../components/DashboardContent';
 
@@ -9,12 +8,10 @@ import DashboardContent from '../../components/DashboardContent';
 export const dynamic = 'force-dynamic';
 export const runtime = 'edge'; // Skip prerendering at build time
 
-export default function DashboardPage() {
-  const user = useUser();
-
+export default function Dashboard() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <Layout title="Dashboard - headcraftAI" user={user}>
+      <Layout>
         <DashboardContent />
       </Layout>
     </Suspense>

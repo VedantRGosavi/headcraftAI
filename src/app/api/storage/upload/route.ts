@@ -1,20 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stackServerApp } from '../../../../stack';
+import { stackServerApp } from '../../_stack';
 import { put } from '@vercel/blob';
 
 // Helper to create error response
 function createErrorResponse(message: string, status: number = 400) {
-  return NextResponse.json(
-    { error: message },
-    { 
-      status,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      }
-    }
-  );
+  return new Response(message, { status });
 }
 
 export async function OPTIONS() {
@@ -30,13 +20,11 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the current user
     const user = await stackServerApp.getUser();
     if (!user) {
       return createErrorResponse('Unauthorized', 401);
     }
 
-    // Get the form data
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const path = formData.get('path') as string;

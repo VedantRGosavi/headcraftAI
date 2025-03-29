@@ -2,9 +2,13 @@
 export interface Image {
     id: string;
     user_id: string;
-    type: 'uploaded' | 'generated';
+    type: 'uploaded' | 'headshot';
     url: string;
     created_at: string;
+    status?: 'pending' | 'processing' | 'completed' | 'failed';
+    prompt?: string;
+    generated_image_id?: string;
+    updated_at?: string;
   }
   
   export interface Headshot {

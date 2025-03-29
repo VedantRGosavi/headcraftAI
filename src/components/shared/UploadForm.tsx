@@ -92,7 +92,10 @@ const UploadForm: React.FC<UploadFormProps> = ({
         .filter(image => !image.uploaded)
         .map(async (image) => {
           try {
-            const uploadedImage = await uploadImage(image.file, currentUser.id);
+            const uploadedImage = await uploadImage({
+              file: image.file,
+              userId: currentUser.id
+            });
             return uploadedImage;
           } catch (error) {
             console.error('Error uploading image:', error);

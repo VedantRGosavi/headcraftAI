@@ -1,9 +1,8 @@
 // pages/api/upload/upload.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
-import formidable from 'formidable';
+import { NextRequest, NextResponse } from 'next/server';
+import { stackClient } from '../../../lib/stack-client';
 import { uploadImage } from '../../../lib/images';
 import fs from 'fs';
-import { stackServerApp } from '@/stack';
 
 // Disable the default body parser
 export const config = {
@@ -12,69 +11,60 @@ export const config = {
   },
 };
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // Only accept POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+function createErrorResponse(message: string, status: number = 400) {
+  return NextResponse.json(
+    { error: message },
+    { status }
+  );
+}
 
-  // Check auth
-  const user = await stackServerApp.getUser();
-
-  if (!user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const userId = user.id;
-
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
+export async function POST(req: NextRequest) {
   try {
-    // Parse form data
-    const form = formidable({ multiples: true });
-    
-    const parseForm = (): Promise<{ fields: formidable.Fields; files: formidable.Files }> => {
-      return new Promise((resolve, reject) => {
-        form.parse(req, (err, fields, files) => {
-          if (err) {
-            reject(err);
-          }
-          resolve({ fields, files });
-        });
-      });
-    };
-
-    const { files } = await parseForm();
-    const uploadedImages = [];
-
-    // Handle multiple file uploads
-    const uploadFiles = Array.isArray(files.file) ? files.file : [files.file];
-
-    for (const file of uploadFiles) {
-      if (!file) continue;
-      
-      // Create a File object from the uploaded file
-      const content = await fs.promises.readFile(file.filepath);
-      const fileObj = new File([content], file.originalFilename || 'upload.jpg', {
-        type: file.mimetype || 'image/jpeg',
-      });
-
-      // Upload to Supabase
-      const image = await uploadImage(fileObj, userId);
-      uploadedImages.push(image);
-
-      // Clean up the temp file
-      await fs.promises.unlink(file.filepath);
+    const user = await stackClient.getUser();
+    if (!user) {
+      return createErrorResponse('Unauthorized', 401);
     }
 
-    return res.status(200).json({ images: uploadedImages });
+    const formData = await req.formData();
+    const file = formData.get('file') as File;
+
+    if (!file) {
+      return createErrorResponse('No file uploaded');
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/heic'];
+    if (!allowedTypes.includes(file.type)) {
+      return createErrorResponse('Invalid file type. Only JPEG, PNG, and HEIC files are allowed.');
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (file.size > maxSize) {
+      return createErrorResponse('File size too large. Maximum size is 10MB.');
+    }
+
+    // Convert File to Buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Create a temporary file
+    const tempPath = `/tmp/${file.name}`;
+    fs.writeFileSync(tempPath, buffer);
+
+    try {
+      // Upload the file
+      const uploadedImage = await uploadImage({
+        file: tempPath,
+        userId: user.id
+      });
+      return NextResponse.json(uploadedImage);
+    } finally {
+      // Clean up temporary file
+      fs.unlinkSync(tempPath);
+    }
   } catch (error) {
-    console.error('Error in upload API:', error);
-    return res.status(500).json({ error: 'Failed to upload images' });
+    console.error('Error uploading file:', error);
+    return createErrorResponse('Failed to upload file', 500);
   }
 }

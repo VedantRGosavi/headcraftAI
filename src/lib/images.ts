@@ -1,8 +1,8 @@
 // lib/images.ts
 import { v4 as uuidv4 } from 'uuid';
 import { Image, Headshot, HeadshotWithImages } from '../types/image';
+import { db } from './db';
 
-const UPLOADED_FOLDER = 'uploaded';
 const GENERATED_FOLDER = 'generated';
 
 // Helper function to upload file to storage
@@ -36,41 +36,38 @@ async function uploadFileToStorage(file: File | Blob, filePath: string): Promise
 }
 
 /**
- * Upload an image to storage
- * @param file The file to upload
- * @param userId The ID of the user
- * @returns The uploaded image information
+ * Upload an image and store its metadata in the database
+ * @param params Object containing file/filePath and userId
+ * @returns The uploaded image metadata
  */
-export async function uploadImage(file: File, userId: string): Promise<Image> {
+export async function uploadImage(params: { 
+  file: File | string;
+  userId: string;
+  fileType?: string;
+}): Promise<Image> {
   try {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `${UPLOADED_FOLDER}/${userId}/${fileName}`;
-
-    // Upload file to storage
-    const publicUrl = await uploadFileToStorage(file, filePath);
-
-    // Store image record through API
-    const response = await fetch('/api/images', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'uploadImage',
-        url: publicUrl,
-        type: 'uploaded',
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to store image record');
+    let publicUrl: string;
+    
+    if (typeof params.file === 'string') {
+      // If file is a path string, use it directly
+      publicUrl = params.file;
+    } else {
+      // If file is a File object, upload it to storage
+      const fileName = `${uuidv4()}.${params.file.type.split('/')[1]}`;
+      const filePath = `uploads/${params.userId}/${fileName}`;
+      publicUrl = await uploadFileToStorage(params.file, filePath);
     }
 
-    return await response.json();
+    // Store metadata in database
+    const result = await db.query(
+      'INSERT INTO images (url, type, user_id) VALUES ($1, $2, $3) RETURNING *',
+      [publicUrl, 'uploaded', params.userId]
+    );
+
+    return result.rows[0] as Image;
   } catch (error) {
-    console.error('Error in uploadImage:', error);
-    throw error;
+    console.error('Error uploading image:', error);
+    throw new Error('Failed to upload image');
   }
 }
 
@@ -207,44 +204,38 @@ export async function getHeadshotWithImages(headshotId: string): Promise<Headsho
 }
 
 /**
- * Get all headshots for a user
- * @returns Array of headshots with their images
- */
-export async function getUserHeadshots(): Promise<HeadshotWithImages[]> {
-  try {
-    const response = await fetch(`/api/images?action=getUserHeadshots`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to get user headshots');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error in getUserHeadshots:', error);
-    throw error;
-  }
-}
-
-/**
- * Get all uploaded images for a user
+ * Get all uploaded images for the current user
  * @returns Array of uploaded images
  */
 export async function getUserUploadedImages(): Promise<Image[]> {
   try {
-    const response = await fetch(`/api/images?action=getUserUploadedImages`, {
-      method: 'GET',
-    });
+    const result = await db.query(
+      'SELECT * FROM images WHERE user_id = $1 AND type = $2 ORDER BY created_at DESC',
+      ['mock-user-id', 'uploaded']
+    );
 
-    if (!response.ok) {
-      throw new Error('Failed to get user uploaded images');
-    }
-
-    return await response.json();
+    return result.rows as Image[];
   } catch (error) {
-    console.error('Error in getUserUploadedImages:', error);
-    throw error;
+    console.error('Error getting user uploaded images:', error);
+    throw new Error('Failed to get user uploaded images');
+  }
+}
+
+/**
+ * Get all generated headshots for the current user
+ * @returns Array of generated headshots
+ */
+export async function getUserHeadshots(): Promise<Image[]> {
+  try {
+    const result = await db.query(
+      'SELECT * FROM images WHERE user_id = $1 AND type = $2 ORDER BY created_at DESC',
+      ['mock-user-id', 'headshot']
+    );
+
+    return result.rows as Image[];
+  } catch (error) {
+    console.error('Error getting user headshots:', error);
+    throw new Error('Failed to get user headshots');
   }
 }
 
